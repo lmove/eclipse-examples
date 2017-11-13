@@ -10,8 +10,12 @@
  *******************************************************************************/
 package example.osgi.bundletracker;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleActivator;
@@ -92,8 +96,53 @@ public class Activator implements BundleActivator {
 
 	public void stop(BundleContext context) throws Exception {
 		System.out.println("Stopping Bundle Tracker");
+		String[][] m = getTimeConsumingBundles();
+		printMap(m);
+		System.out.println("[SIZE] " + data.size());
 		bundleTracker.close();
 		bundleTracker = null;
+	}
+	
+	private String[][] getTimeConsumingBundles() {
+		String[][] maxValues = new String[5][2];
+		for (int i = 0; i < maxValues.length; i++) {
+			maxValues[i][0] = "null";
+			maxValues[i][1] = "0";
+		}
+		
+		Iterator it = data.entrySet().iterator();
+		while(it.hasNext()) {
+			
+			Map.Entry s = (Map.Entry) it.next();
+			String[] v = (String[]) s.getValue();
+			boolean found = false;
+			String[] current = null;
+			
+			System.out.println("[ARRAY] " + s.getKey() + " - " + v[2]);
+			for(int i = 0; i < maxValues.length; i++) {
+				if(!found && (Integer.parseInt(v[2]) > Integer.parseInt(maxValues[i][1]))) {
+					current = (String[]) maxValues[i].clone();
+					maxValues[i][0] = (String) s.getKey();
+					maxValues[i][1] = v[2];
+					found = true; 
+				}
+				else if(found && current != null) {
+					String[] temp = (String[]) maxValues[i].clone();
+					maxValues[i] = current;
+					current = temp;
+				}
+				System.out.print("" + maxValues[i][0] + " - " + maxValues[i][1] + ", ");
+			}
+			System.out.println("");
+		}
+		
+		return maxValues;
+	}
+	
+	private void printMap(String[][] m) {
+		for(int i = 0; i < m.length; i++) {
+			System.out.println("[TOP]" + m[i][0] + " - " + m[i][1]);
+		}
 	}
 	
 	private static final class OSGiBundleTracker extends BundleTracker {
@@ -103,7 +152,7 @@ public class Activator implements BundleActivator {
 		}
 
 		public Object addingBundle(Bundle bundle, BundleEvent event) {
-			data.put(bundle.getSymbolicName(), new String[]{""+System.currentTimeMillis(),"0","0"});
+			data.put(bundle.getSymbolicName() + "_" + bundle.getVersion(), new String[]{""+System.currentTimeMillis(),"0","0"});
 			System.out.println("[ADD] " + bundle.getSymbolicName() + " - " + System.currentTimeMillis() + " - " + typeAsString(event) + " - " + stateAsString(bundle));
 			return bundle;
 		}
@@ -116,14 +165,15 @@ public class Activator implements BundleActivator {
 		}
 		
 		public void removedBundle(Bundle bundle, BundleEvent event, Object object) {
-			print(bundle, event);
+			//print(bundle, event);
 		}
 		
 		public void modifiedBundle(Bundle bundle, BundleEvent event, Object object) {
 			if(event.getType() == BundleEvent.RESOLVED) {
-				String[] time = (String[]) data.get(bundle.getSymbolicName());
+				String[] time = (String[]) data.get(bundle.getSymbolicName() + "_" + bundle.getVersion());
 				time[1] = "" + System.currentTimeMillis();
 				time[2] = "" + (Long.parseLong(time[1]) - Long.parseLong(time[0]));
+				data.put(bundle.getSymbolicName() + "_" + bundle.getVersion(), time);
 				System.out.println("[MOD] " + bundle.getSymbolicName() + " - " + System.currentTimeMillis() + " - " + typeAsString(event) + " - " + stateAsString(bundle));
 			}	
 		}
