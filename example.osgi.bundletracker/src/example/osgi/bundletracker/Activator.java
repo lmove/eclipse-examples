@@ -10,9 +10,14 @@
  *******************************************************************************/
 package example.osgi.bundletracker;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Properties;
 
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleActivator;
@@ -22,10 +27,10 @@ import org.osgi.util.tracker.BundleTracker;
 import org.osgi.util.tracker.BundleTrackerCustomizer;
 
 public class Activator implements BundleActivator {
-	
-	private static final int SLOWER_BUNDLES = 10;
-	private OSGiBundleTracker bundleTracker;
 	private static Map data;
+	private OSGiBundleTracker bundleTracker;
+	private Properties properties;
+	
 	
 	private static void initializeData() {
 		data = new HashMap();
@@ -93,29 +98,69 @@ public class Activator implements BundleActivator {
 	}
 
 	public void stop(BundleContext context) throws Exception {
-		System.out.println("Stopping Bundle Tracker");
-		String[][] m = getTimeConsumingBundles();
-		printMap(m);
-		System.out.println("[SIZE] " + data.size());
-		bundleTracker.close();
-		bundleTracker = null;
+		try {
+			System.out.println("Stopping Bundle Tracker");
+			initializePropertiesReader();
+			
+			String[][] m = null;
+			String mode = properties.getProperty("mode");
+			
+			if(mode.equals("SMELLY")) {
+				m = getSmellyBundles();
+			}
+			else {
+				m = getSlowestBundles();
+			}
+			printMap(m);
+			System.out.println("[SIZE] " + data.size());
+			
+			bundleTracker.close();
+			bundleTracker = null;
+		}
+		catch(Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	private void initializePropertiesReader() {
+		properties = new Properties();
+		try {
+			InputStream is = new FileInputStream("tracker.properties");
+			properties.load(is);
+		}
+		catch(IOException e) {
+			e.printStackTrace();
+		}
 	}
 	
-	private String[][] getTimeConsumingBundles() {
-		String[][] maxValues = initializeSlowerBundles();
+	private String[][] getSmellyBundles() {
+		String[][] maxValues = initializeTopBundles();
+		
+		for(int i = 0; i < maxValues.length; i++) {
+			String key = properties.getProperty("bundles[" + i + "]");
+			String[] value = (String[]) data.get(key);
+			System.out.println(key + " - " + value);
+			maxValues[i][0] = key;
+			maxValues[i][1] = value[2];
+		}
+		return maxValues;
+	}
+	
+	private String[][] getSlowestBundles() {
+		String[][] maxValues = initializeTopBundles();
 		Iterator it = data.entrySet().iterator();
 		
 		while(it.hasNext()) {
-			Map.Entry s = (Map.Entry) it.next();
-			String[] v = (String[]) s.getValue();
+			Map.Entry entry = (Map.Entry) it.next();
+			String[] value = (String[]) entry.getValue();
 			boolean found = false;
 			String[] current = null;
 			
 			for(int i = 0; i < maxValues.length; i++) {
-				if(!found && (Integer.parseInt(v[2]) > Integer.parseInt(maxValues[i][1]))) {
+				if(!found && (Integer.parseInt(value[2]) > Integer.parseInt(maxValues[i][1]))) {
 					current = (String[]) maxValues[i].clone();
-					maxValues[i][0] = (String) s.getKey();
-					maxValues[i][1] = v[2];
+					maxValues[i][0] = (String) entry.getKey();
+					maxValues[i][1] = value[2];
 					found = true; 
 				}
 				else if(found && current != null) {
@@ -129,8 +174,10 @@ public class Activator implements BundleActivator {
 		return maxValues;
 	}
 	
-	private String[][] initializeSlowerBundles() {
-		String[][] maxValues = new String[SLOWER_BUNDLES][2];
+	private String[][] initializeTopBundles() {
+		int bundles = Integer.parseInt(properties.getProperty("bundles"));
+		String[][] maxValues = new String[bundles][2];
+		
 		for (int i = 0; i < maxValues.length; i++) {
 			maxValues[i][0] = "null";
 			maxValues[i][1] = "0";
@@ -139,8 +186,10 @@ public class Activator implements BundleActivator {
 	}
 	
 	private void printMap(String[][] m) {
-		for(int i = 0; i < m.length; i++) {
-			System.out.println("[TOP]" + m[i][0] + " - " + m[i][1]);
+		if(m != null) {
+			for(int i = 0; i < m.length; i++) {
+				System.out.println("[TOP]" + m[i][0] + " - " + m[i][1]);
+			}
 		}
 	}
 	
@@ -152,7 +201,7 @@ public class Activator implements BundleActivator {
 
 		public Object addingBundle(Bundle bundle, BundleEvent event) {
 			data.put(createBundleKey(bundle), new String[]{""+System.currentTimeMillis(),"0","0"});
-			System.out.println("[ADD] " + bundle.getSymbolicName() + " - " + System.currentTimeMillis() + " - " + typeAsString(event) + " - " + stateAsString(bundle));
+			System.out.println("[ADD] " + createBundleKey(bundle) + " - " + System.currentTimeMillis() + " - " + typeAsString(event) + " - " + stateAsString(bundle));
 			return bundle;
 		}
 		
@@ -166,8 +215,6 @@ public class Activator implements BundleActivator {
 				time[1] = "" + System.currentTimeMillis();
 				time[2] = "" + (Long.parseLong(time[1]) - Long.parseLong(time[0]));
 				data.put(key, time);
-				
-				System.out.println("[MOD] " + bundle.getSymbolicName() + " - " + System.currentTimeMillis() + " - " + typeAsString(event) + " - " + stateAsString(bundle));
 			}	
 		}
 		
