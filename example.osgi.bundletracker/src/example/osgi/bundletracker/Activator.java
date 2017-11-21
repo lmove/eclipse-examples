@@ -14,11 +14,16 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
+import java.util.jar.JarEntry;
+import java.util.jar.JarInputStream;
 
+import org.eclipse.core.runtime.FileLocator;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
@@ -27,72 +32,22 @@ import org.osgi.util.tracker.BundleTracker;
 import org.osgi.util.tracker.BundleTrackerCustomizer;
 
 public class Activator implements BundleActivator {
+	
 	private static Map data;
+	private static Map<Integer,String> bundleStates;
+	private static Map<Integer,String> bundleEventStates;
 	private OSGiBundleTracker bundleTracker;
 	private Properties properties;
 	
-	
-	private static void initializeData() {
-		data = new HashMap();
-	}
-	
-	private static String stateAsString(Bundle bundle) {
-		if (bundle == null) {
-			return "null";
-		}
-		int state = bundle.getState();
-		switch (state) {
-		case Bundle.ACTIVE:
-			return "ACTIVE";
-		case Bundle.INSTALLED:
-			return "INSTALLED";
-		case Bundle.RESOLVED:
-			return "RESOLVED";
-		case Bundle.STARTING:
-			return "STARTING";
-		case Bundle.STOPPING:
-			return "STOPPING";
-		case Bundle.UNINSTALLED:
-			return "UNINSTALLED";
-		default:
-			return "Unknown bundle state: " + state;
-		}
-	}
-
-	private static String typeAsString(BundleEvent event) {
-		if (event == null) {
-			return "null";
-		}
-		int type = event.getType();
-		switch (type) {
-		case BundleEvent.INSTALLED:
-			return "INSTALLED";
-		case BundleEvent.LAZY_ACTIVATION:
-			return "LAZY_ACTIVATION";
-		case BundleEvent.RESOLVED:
-			return "RESOLVED";
-		case BundleEvent.STARTED:
-			return "STARTED";
-		case BundleEvent.STARTING:
-			return "Starting";
-		case BundleEvent.STOPPED:
-			return "STOPPED";
-		case BundleEvent.UNINSTALLED:
-			return "UNINSTALLED";
-		case BundleEvent.UNRESOLVED:
-			return "UNRESOLVED";
-		case BundleEvent.UPDATED:
-			return "UPDATED";
-		default:
-			return "Unknown event type: " + type;
-		}
-	}
-
 	public void start(BundleContext context) throws Exception {
 		System.out.println("Starting Bundle Tracker");
 		int trackStates = Bundle.STARTING | Bundle.STOPPING | Bundle.RESOLVED | Bundle.INSTALLED | Bundle.UNINSTALLED;
 		
+		//Initialize maps with bundles data and constants.
 		initializeData();
+		initializeBundleStates();
+		initializeBundleEventStates();
+		
 		bundleTracker = new OSGiBundleTracker(context, trackStates, null);
 		bundleTracker.open();
 	}
@@ -121,6 +76,45 @@ public class Activator implements BundleActivator {
 			e.printStackTrace();
 		}
 	}
+	
+	private static void initializeData() {
+		data = new HashMap();
+	}
+	
+	private static void initializeBundleStates() {
+		bundleStates = new HashMap<Integer,String>();
+		bundleStates.put(Bundle.ACTIVE, "ACTIVE");
+		bundleStates.put(Bundle.INSTALLED, "INSTALLED");
+		bundleStates.put(Bundle.RESOLVED, "RESOLVED");
+		bundleStates.put(Bundle.STARTING, "STARTING");
+		bundleStates.put(Bundle.STOPPING, "STOPPING");
+		bundleStates.put(Bundle.UNINSTALLED, "UNINSTALLED");
+	}
+	
+	private static void initializeBundleEventStates() {
+		bundleEventStates = new HashMap<Integer,String>();
+		bundleEventStates.put(BundleEvent.INSTALLED, "INSTALLED");
+		bundleEventStates.put(BundleEvent.LAZY_ACTIVATION, "LAZY_ACTIVATION");
+		bundleEventStates.put(BundleEvent.RESOLVED, "RESOLVED");
+		bundleEventStates.put(BundleEvent.STARTED, "STARTED");
+		bundleEventStates.put(BundleEvent.STARTING, "STARTING");
+		bundleEventStates.put(BundleEvent.STOPPED, "STOPPED");
+		bundleEventStates.put(BundleEvent.UNINSTALLED, "UNINSTALLED");
+		bundleEventStates.put(BundleEvent.UNRESOLVED, "UNRESOLVED");
+		bundleEventStates.put(BundleEvent.UPDATED, "UPDATED");
+	}
+	
+	private static String stateAsString(Bundle bundle) {
+		return (bundle == null) ? "NULL" : 
+			(bundleStates.containsKey(bundle.getState())) ? bundleStates.get(bundle.getState()) :
+			"UNDEFINED";
+	}
+
+	private static String typeAsString(BundleEvent event) {
+		return (event == null) ? "NULL" : 
+			(bundleEventStates.containsKey(event.getType())) ? bundleEventStates.get(event.getType()) :
+			"UNDEFINED";
+	}
 
 	private void initializePropertiesReader() {
 		properties = new Properties();
@@ -139,7 +133,6 @@ public class Activator implements BundleActivator {
 		for(int i = 0; i < maxValues.length; i++) {
 			String key = properties.getProperty("bundles[" + i + "]");
 			String[] value = (String[]) data.get(key);
-			System.out.println(key + " - " + value);
 			maxValues[i][0] = key;
 			maxValues[i][1] = value[2];
 		}
@@ -199,9 +192,10 @@ public class Activator implements BundleActivator {
 			super(context, stateMask, customizer);
 		}
 
-		public Object addingBundle(Bundle bundle, BundleEvent event) {
+		public Object addingBundle(Bundle bundle, BundleEvent event) {			
 			data.put(createBundleKey(bundle), new String[]{""+System.currentTimeMillis(),"0","0"});
 			System.out.println("[ADD] " + createBundleKey(bundle) + " - " + System.currentTimeMillis() + " - " + typeAsString(event) + " - " + stateAsString(bundle));
+
 			return bundle;
 		}
 		
@@ -209,13 +203,76 @@ public class Activator implements BundleActivator {
 		}
 		
 		public void modifiedBundle(Bundle bundle, BundleEvent event, Object object) {
+			
 			if(event.getType() == BundleEvent.RESOLVED) {
 				String key = createBundleKey(bundle);
 				String[] time = (String[]) data.get(key);
 				time[1] = "" + System.currentTimeMillis();
 				time[2] = "" + (Long.parseLong(time[1]) - Long.parseLong(time[0]));
 				data.put(key, time);
+				
+				System.out.println("[CLASSPATH] " + System.getProperty("user.dir") + ": " + key);
+				try {
+					ClassLoader bundleClassLoader = (ClassLoader) getBundleClassLoader(bundle,key);
+					if(bundleClassLoader != null) {
+//						URL mainURL = bundleClassLoader.getResource("");
+//						URL otherURL = FileLocator.toFileURL(mainURL);
+//						File root = new File(otherURL.toURI());
+//						getClassPath(root);
+						
+						Enumeration<URL> urls = bundleClassLoader.getResources("");
+						URL url = null;
+						while(urls.hasMoreElements()) {
+							url = urls.nextElement();
+							getClassPath(new File(FileLocator.toFileURL(url).toURI()));
+						}
+					}
+				}
+				catch(Exception e) {
+					e.printStackTrace();
+				}
+				
 			}	
+			
+			
+		}
+		
+		private void getClassPath(File folder) {
+			for(File f : folder.listFiles()) {
+				if(f.isFile()) {
+					System.out.println("[FILE] " + f.getName());
+				}
+				else {
+					System.out.println("[FOLDER] " + f.getName());
+					getClassPath(f);
+				}
+			}
+		}
+		
+		@SuppressWarnings("finally")
+		private ClassLoader getBundleClassLoader(Bundle bundle, String bundleKey) {
+			ClassLoader classloader = null;
+			
+			try {
+				String path = System.getProperty("user.dir") + "/plugins/" + bundleKey + ".jar";
+				InputStream inputStream = new FileInputStream(path);
+				JarInputStream jarStream = new JarInputStream(inputStream);
+				JarEntry entry = jarStream.getNextJarEntry();
+				
+				while(entry != null && classloader == null) {
+					if(!entry.isDirectory() && entry.getName().endsWith(".class")) {
+						String randomClass = (entry.getName().substring(0,entry.getName().lastIndexOf(".class"))).replace("/", ".");
+						classloader = bundle.loadClass(randomClass).getClassLoader();
+					}
+					entry = jarStream.getNextJarEntry();
+				}
+			}
+			catch(Exception e) {
+				//This is a bundle fragment. Returns null.
+			}
+			finally {
+				return classloader;
+			}
 		}
 		
 		private String createBundleKey(Bundle bundle) {
