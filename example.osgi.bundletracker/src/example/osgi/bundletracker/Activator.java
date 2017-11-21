@@ -16,12 +16,14 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintWriter;
 import java.net.URL;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
+import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
 
@@ -42,13 +44,14 @@ public class Activator implements BundleActivator {
 	private static final String CLASS_EXTENSION = ".class";
 	private static final String JAR_EXTENSION = ".jar";
 	private static final String DATA_FOLDER = "framework-metadata";
+	private static final String CSV_SEPARATOR = ",";
 	
 	
 	//------------------------------------------------------------
     // Fields
     //------------------------------------------------------------
 	
-	private static Map<String,Double[]> performanceData;
+	private static Map<String,Long[]> performanceData;
 	private static Map<String,Integer> classpathData;
 	private static Map<Integer,String> bundleStates;
 	private static Map<Integer,String> bundleEventStates;
@@ -96,8 +99,9 @@ public class Activator implements BundleActivator {
 //				m = getSlowestBundles();
 //			}
 //			printMap(m);
-			
-			
+			classpathToCSV();
+			performanceToCSV();
+			System.out.println("Metadata was printed.");
 			
 			bundleTracker.close();
 			bundleTracker = null;
@@ -113,7 +117,7 @@ public class Activator implements BundleActivator {
 	 */
 	private static void initializeData() {
 		classpathData = new HashMap<String,Integer>();
-		performanceData = new HashMap();
+		performanceData = new HashMap<String, Long[]>();
 	}
 	
 	/**
@@ -145,25 +149,82 @@ public class Activator implements BundleActivator {
 		bundleEventStates.put(BundleEvent.UPDATED, "UPDATED");
 	}
 	
+	/**
+	 * Returns a string representing the state of the bundle.
+	 */
 	private static String stateAsString(Bundle bundle) {
 		return (bundle == null) ? "NULL" : 
 			(bundleStates.containsKey(bundle.getState())) ? bundleStates.get(bundle.getState()) :
 			"UNDEFINED";
 	}
 
+	/**
+	 * Returns a string representing the state of the bundle event.
+	 */
 	private static String typeAsString(BundleEvent event) {
 		return (event == null) ? "NULL" : 
 			(bundleEventStates.containsKey(event.getType())) ? bundleEventStates.get(event.getType()) :
 			"UNDEFINED";
 	}
 
+	/**
+	 * Creates a CSV file with the classpath size of resolved
+	 * and non-fragment bundles.
+	 */
 	private void classpathToCSV() {
-		
+		try {
+			File file = new File(DATA_FOLDER + "/classpath-info.csv");
+			file.getParentFile().mkdirs();
+			
+			PrintWriter writer = new PrintWriter(file);
+			StringBuilder builder = new StringBuilder();
+			builder.append("Bundle,Classpath Size\n");
+					
+			Set<Entry<String,Integer>> classpaths = classpathData.entrySet();
+			Iterator<Entry<String,Integer>> it = classpaths.iterator();
+			Entry<String,Integer> entry = null;
+			
+			while(it.hasNext()) {
+				entry = it.next();
+				builder.append(entry.getKey() + CSV_SEPARATOR + entry.getValue() + '\n');
+			}
+			writer.write(builder.toString());
+			writer.close();
+		}
+		catch(IOException e) {
+			e.printStackTrace();
+		}
 	}
 	
+	/**
+	 * Creates a CSV file with the resolving performance of 
+	 * resolved bundles.
+	 */
 	private void performanceToCSV() {
-		
+		try {
+			File file = new File(DATA_FOLDER + "/performance-info.csv");
+			file.getParentFile().mkdirs();
+			
+			PrintWriter writer = new PrintWriter(file);
+			StringBuilder builder = new StringBuilder();
+			builder.append("Bundle,Resolving Time\n");
+					
+			Set<Entry<String, Long[]>> performance = performanceData.entrySet();
+			Iterator<Entry<String, Long[]>> it = performance.iterator();
+			Entry<String,Long[]> entry = null;
+			
+			while(it.hasNext()) {
+				entry = it.next();
+				builder.append(entry.getKey() + CSV_SEPARATOR + entry.getValue()[2] + '\n');
+			}
+			writer.write(builder.toString());
+			writer.close();
+		}
+		catch(IOException e) {
+			e.printStackTrace();
+		}
 	}
+	
 	private void initializePropertiesReader() {
 		properties = new Properties();
 		try {
@@ -180,7 +241,7 @@ public class Activator implements BundleActivator {
 		
 		for(int i = 0; i < maxValues.length; i++) {
 			String key = properties.getProperty("bundles[" + i + "]");
-			Double[] value = performanceData.get(key);
+			Long[] value = performanceData.get(key);
 			maxValues[i][0] = key;
 			maxValues[i][1] = "" + value[2];
 		}
@@ -256,7 +317,7 @@ public class Activator implements BundleActivator {
 		 */
 		public Object addingBundle(Bundle bundle, BundleEvent event) {
 			String key = createBundleKey(bundle);
-			performanceData.put(key, new Double[]{System.currentTimeMillis() + 0.0, 0.0, 0.0});
+			performanceData.put(key, new Long[]{System.currentTimeMillis(), 0L, -1L});
 			System.out.println("[ADD] " + key + " - STATE: " + stateAsString(bundle));
 			return bundle;
 		}
@@ -273,8 +334,8 @@ public class Activator implements BundleActivator {
 			if(event.getType() == BundleEvent.RESOLVED) {
 				
 				//Updates performance data structure.
-				Double[] time = performanceData.get(key);
-				time[1] = System.currentTimeMillis() + 0.0;
+				Long[] time = performanceData.get(key);
+				time[1] = System.currentTimeMillis();
 				time[2] = time[1] - time[0];
 				performanceData.put(key, time);
 				
