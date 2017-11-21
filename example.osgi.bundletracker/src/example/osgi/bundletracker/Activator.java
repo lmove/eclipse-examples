@@ -38,31 +38,31 @@ import org.osgi.util.tracker.BundleTrackerCustomizer;
 public class Activator implements BundleActivator {
 
 	//------------------------------------------------------------
-    // Constants
-    //------------------------------------------------------------
-	
+	// Constants
+	//------------------------------------------------------------
+
 	private static final String CLASS_EXTENSION = ".class";
 	private static final String JAR_EXTENSION = ".jar";
 	private static final String DATA_FOLDER = "framework-metadata";
 	private static final String CSV_SEPARATOR = ",";
-	
-	
+
+
 	//------------------------------------------------------------
-    // Fields
-    //------------------------------------------------------------
-	
+	// Fields
+	//------------------------------------------------------------
+
 	private static Map<String,Long[]> performanceData;
 	private static Map<String,Integer> classpathData;
 	private static Map<Integer,String> bundleStates;
 	private static Map<Integer,String> bundleEventStates;
 	private OSGiBundleTracker bundleTracker;
 	private Properties properties;
-	
-	
+
+
 	//------------------------------------------------------------
-    // Methods
-    //------------------------------------------------------------
-	
+	// Methods
+	//------------------------------------------------------------
+
 	/**
 	 * Sets the tracked states and the employed data structures.
 	 * The OSGi bundle tracker is initialized.
@@ -70,12 +70,12 @@ public class Activator implements BundleActivator {
 	public void start(BundleContext context) throws Exception {
 		System.out.println("Starting Bundle Tracker");
 		int trackStates = Bundle.STARTING | Bundle.STOPPING | Bundle.RESOLVED | Bundle.INSTALLED | Bundle.UNINSTALLED;
-		
+
 		//Initialize maps with bundles data and constants.
 		initializeData();
 		initializeBundleStates();
 		initializeBundleEventStates();
-		
+
 		bundleTracker = new OSGiBundleTracker(context, trackStates, null);
 		bundleTracker.open();
 	}
@@ -88,21 +88,21 @@ public class Activator implements BundleActivator {
 		try {
 			System.out.println("Stopping Bundle Tracker");
 			//initializePropertiesReader();
-			
-//			String[][] m = null;
-//			String mode = properties.getProperty("mode");
-//			
-//			if(mode.equals("SMELLY")) {
-//				m = getSmellyBundles();
-//			}
-//			else {
-//				m = getSlowestBundles();
-//			}
-//			printMap(m);
+
+			//			String[][] m = null;
+			//			String mode = properties.getProperty("mode");
+			//			
+			//			if(mode.equals("SMELLY")) {
+			//				m = getSmellyBundles();
+			//			}
+			//			else {
+			//				m = getSlowestBundles();
+			//			}
+			//			printMap(m);
 			classpathToCSV();
 			performanceToCSV();
 			System.out.println("Metadata was printed.");
-			
+
 			bundleTracker.close();
 			bundleTracker = null;
 		}
@@ -110,7 +110,7 @@ public class Activator implements BundleActivator {
 			e.printStackTrace();
 		}
 	}
-	
+
 	/**
 	 * Initializes data structures related to performance and
 	 * classpath size information.
@@ -119,7 +119,7 @@ public class Activator implements BundleActivator {
 		classpathData = new HashMap<String,Integer>();
 		performanceData = new HashMap<String, Long[]>();
 	}
-	
+
 	/**
 	 * Initializes the bundle states map.
 	 */
@@ -132,7 +132,7 @@ public class Activator implements BundleActivator {
 		bundleStates.put(Bundle.STOPPING, "STOPPING");
 		bundleStates.put(Bundle.UNINSTALLED, "UNINSTALLED");
 	}
-	
+
 	/**
 	 * Initializes the bundle event states map.
 	 */
@@ -148,14 +148,14 @@ public class Activator implements BundleActivator {
 		bundleEventStates.put(BundleEvent.UNRESOLVED, "UNRESOLVED");
 		bundleEventStates.put(BundleEvent.UPDATED, "UPDATED");
 	}
-	
+
 	/**
 	 * Returns a string representing the state of the bundle.
 	 */
 	private static String stateAsString(Bundle bundle) {
 		return (bundle == null) ? "NULL" : 
 			(bundleStates.containsKey(bundle.getState())) ? bundleStates.get(bundle.getState()) :
-			"UNDEFINED";
+				"UNDEFINED";
 	}
 
 	/**
@@ -164,7 +164,7 @@ public class Activator implements BundleActivator {
 	private static String typeAsString(BundleEvent event) {
 		return (event == null) ? "NULL" : 
 			(bundleEventStates.containsKey(event.getType())) ? bundleEventStates.get(event.getType()) :
-			"UNDEFINED";
+				"UNDEFINED";
 	}
 
 	/**
@@ -175,15 +175,15 @@ public class Activator implements BundleActivator {
 		try {
 			File file = new File(DATA_FOLDER + "/classpath-info.csv");
 			file.getParentFile().mkdirs();
-			
+
 			PrintWriter writer = new PrintWriter(file);
 			StringBuilder builder = new StringBuilder();
 			builder.append("Bundle,Classpath Size\n");
-					
+
 			Set<Entry<String,Integer>> classpaths = classpathData.entrySet();
 			Iterator<Entry<String,Integer>> it = classpaths.iterator();
 			Entry<String,Integer> entry = null;
-			
+
 			while(it.hasNext()) {
 				entry = it.next();
 				builder.append(entry.getKey() + CSV_SEPARATOR + entry.getValue() + '\n');
@@ -195,7 +195,7 @@ public class Activator implements BundleActivator {
 			e.printStackTrace();
 		}
 	}
-	
+
 	/**
 	 * Creates a CSV file with the resolving performance of 
 	 * resolved bundles.
@@ -204,15 +204,15 @@ public class Activator implements BundleActivator {
 		try {
 			File file = new File(DATA_FOLDER + "/performance-info.csv");
 			file.getParentFile().mkdirs();
-			
+
 			PrintWriter writer = new PrintWriter(file);
 			StringBuilder builder = new StringBuilder();
 			builder.append("Bundle,Resolving Time\n");
-					
+
 			Set<Entry<String, Long[]>> performance = performanceData.entrySet();
 			Iterator<Entry<String, Long[]>> it = performance.iterator();
 			Entry<String,Long[]> entry = null;
-			
+
 			while(it.hasNext()) {
 				entry = it.next();
 				builder.append(entry.getKey() + CSV_SEPARATOR + entry.getValue()[2] + '\n');
@@ -224,7 +224,7 @@ public class Activator implements BundleActivator {
 			e.printStackTrace();
 		}
 	}
-	
+
 	private void initializePropertiesReader() {
 		properties = new Properties();
 		try {
@@ -235,10 +235,10 @@ public class Activator implements BundleActivator {
 			e.printStackTrace();
 		}
 	}
-	
+
 	private String[][] getSmellyBundles() {
 		String[][] maxValues = initializeTopBundles();
-		
+
 		for(int i = 0; i < maxValues.length; i++) {
 			String key = properties.getProperty("bundles[" + i + "]");
 			Long[] value = performanceData.get(key);
@@ -247,17 +247,17 @@ public class Activator implements BundleActivator {
 		}
 		return maxValues;
 	}
-	
+
 	private String[][] getSlowestBundles() {
 		String[][] maxValues = initializeTopBundles();
 		Iterator it = performanceData.entrySet().iterator();
-		
+
 		while(it.hasNext()) {
 			Map.Entry entry = (Map.Entry) it.next();
 			String[] value = (String[]) entry.getValue();
 			boolean found = false;
 			String[] current = null;
-			
+
 			for(int i = 0; i < maxValues.length; i++) {
 				if(!found && (Integer.parseInt(value[2]) > Integer.parseInt(maxValues[i][1]))) {
 					current = (String[]) maxValues[i].clone();
@@ -272,21 +272,21 @@ public class Activator implements BundleActivator {
 				}
 			}
 		}
-		
+
 		return maxValues;
 	}
-	
+
 	private String[][] initializeTopBundles() {
 		int bundles = Integer.parseInt(properties.getProperty("bundles"));
 		String[][] maxValues = new String[bundles][2];
-		
+
 		for (int i = 0; i < maxValues.length; i++) {
 			maxValues[i][0] = "null";
 			maxValues[i][1] = "0";
 		}
 		return maxValues;
 	}
-	
+
 	private void printMap(String[][] m) {
 		if(m != null) {
 			for(int i = 0; i < m.length; i++) {
@@ -294,18 +294,18 @@ public class Activator implements BundleActivator {
 			}
 		}
 	}
-	
-	
+
+
 	//------------------------------------------------------------
-    // Nested Class
-    //------------------------------------------------------------
-	
+	// Nested Class
+	//------------------------------------------------------------
+
 	private static final class OSGiBundleTracker extends BundleTracker {
 
 		//------------------------------------------------------------
-	    // Methods
-	    //------------------------------------------------------------
-		
+		// Methods
+		//------------------------------------------------------------
+
 		public OSGiBundleTracker(BundleContext context, int stateMask, BundleTrackerCustomizer customizer) {
 			super(context, stateMask, customizer);
 		}
@@ -321,7 +321,7 @@ public class Activator implements BundleActivator {
 			System.out.println("[ADD] " + key + " - STATE: " + stateAsString(bundle));
 			return bundle;
 		}
-		
+
 		/**
 		 * Sets bundle classpath size (in a Resolved state a classloader is 
 		 * assigned to a bundle).
@@ -330,15 +330,15 @@ public class Activator implements BundleActivator {
 		 */
 		public void modifiedBundle(Bundle bundle, BundleEvent event, Object object) {
 			String key = createBundleKey(bundle);
-			
+
 			if(event.getType() == BundleEvent.RESOLVED) {
-				
+
 				//Updates performance data structure.
 				Long[] time = performanceData.get(key);
 				time[1] = System.currentTimeMillis();
 				time[2] = time[1] - time[0];
 				performanceData.put(key, time);
-				
+
 				//Updates classpath data structure.
 				try {
 					ClassLoader bundleClassLoader = (ClassLoader) getBundleClassLoader(bundle);
@@ -355,14 +355,14 @@ public class Activator implements BundleActivator {
 			}	
 			System.out.println("[MODIFIED] " + key + " - STATE: " + stateAsString(bundle));
 		}
-		
+
 		/**
 		 * Computes the classpath size of a given folder (e.g. bundle root
 		 * folder). Class files are counted.
 		 */
 		private int getClassPathSize(File folder) {
 			int size = 0;
-			
+
 			for(File f : folder.listFiles()) {
 				if(f.isFile()) {
 					size = (f.getName().endsWith(CLASS_EXTENSION)) ? size + 1 : size;
@@ -373,23 +373,23 @@ public class Activator implements BundleActivator {
 					System.out.println("[FOLDER] " + f.getName());
 				}
 			}
-			
+
 			return size;
 		}
-		
+
 		/**
 		 * Returns the classloader of a given bundle.
 		 */
 		private ClassLoader getBundleClassLoader(Bundle bundle) {
 			ClassLoader classloader = null;
 			String key = createBundleKey(bundle);
-			
+
 			try {
 				String path = System.getProperty("user.dir") + "/plugins/" + key + JAR_EXTENSION;
 				InputStream inputStream = new FileInputStream(path);
 				JarInputStream jarStream = new JarInputStream(inputStream);
 				JarEntry entry = jarStream.getNextJarEntry();
-				
+
 				while(entry != null && classloader == null) {
 					if(!entry.isDirectory() && entry.getName().endsWith(CLASS_EXTENSION)) {
 						String randomClass = (entry.getName().substring(0,entry.getName().lastIndexOf(CLASS_EXTENSION))).replace("/", ".");
@@ -404,7 +404,7 @@ public class Activator implements BundleActivator {
 				return classloader;
 			}
 		}
-		
+
 		/**
 		 * Creates a bundle identifier: symbolicName_version
 		 */
