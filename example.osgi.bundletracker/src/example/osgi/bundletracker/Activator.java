@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Properties;
 import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
@@ -56,7 +55,6 @@ public class Activator implements BundleActivator {
 	private static Map<Integer,String> bundleStates;
 	private static Map<Integer,String> bundleEventStates;
 	private OSGiBundleTracker bundleTracker;
-	private Properties properties;
 
 
 	//------------------------------------------------------------
@@ -87,18 +85,6 @@ public class Activator implements BundleActivator {
 	public void stop(BundleContext context) throws Exception {
 		try {
 			System.out.println("Stopping Bundle Tracker");
-			//initializePropertiesReader();
-
-			//			String[][] m = null;
-			//			String mode = properties.getProperty("mode");
-			//			
-			//			if(mode.equals("SMELLY")) {
-			//				m = getSmellyBundles();
-			//			}
-			//			else {
-			//				m = getSlowestBundles();
-			//			}
-			//			printMap(m);
 			classpathToCSV();
 			performanceToCSV();
 			System.out.println("Metadata was printed.");
@@ -225,77 +211,7 @@ public class Activator implements BundleActivator {
 		}
 	}
 
-	private void initializePropertiesReader() {
-		properties = new Properties();
-		try {
-			InputStream is = new FileInputStream("tracker.properties");
-			properties.load(is);
-		}
-		catch(IOException e) {
-			e.printStackTrace();
-		}
-	}
-
-	private String[][] getSmellyBundles() {
-		String[][] maxValues = initializeTopBundles();
-
-		for(int i = 0; i < maxValues.length; i++) {
-			String key = properties.getProperty("bundles[" + i + "]");
-			Long[] value = performanceData.get(key);
-			maxValues[i][0] = key;
-			maxValues[i][1] = "" + value[2];
-		}
-		return maxValues;
-	}
-
-	private String[][] getSlowestBundles() {
-		String[][] maxValues = initializeTopBundles();
-		Iterator it = performanceData.entrySet().iterator();
-
-		while(it.hasNext()) {
-			Map.Entry entry = (Map.Entry) it.next();
-			String[] value = (String[]) entry.getValue();
-			boolean found = false;
-			String[] current = null;
-
-			for(int i = 0; i < maxValues.length; i++) {
-				if(!found && (Integer.parseInt(value[2]) > Integer.parseInt(maxValues[i][1]))) {
-					current = (String[]) maxValues[i].clone();
-					maxValues[i][0] = (String) entry.getKey();
-					maxValues[i][1] = value[2];
-					found = true; 
-				}
-				else if(found && current != null) {
-					String[] temp = (String[]) maxValues[i].clone();
-					maxValues[i] = current;
-					current = temp;
-				}
-			}
-		}
-
-		return maxValues;
-	}
-
-	private String[][] initializeTopBundles() {
-		int bundles = Integer.parseInt(properties.getProperty("bundles"));
-		String[][] maxValues = new String[bundles][2];
-
-		for (int i = 0; i < maxValues.length; i++) {
-			maxValues[i][0] = "null";
-			maxValues[i][1] = "0";
-		}
-		return maxValues;
-	}
-
-	private void printMap(String[][] m) {
-		if(m != null) {
-			for(int i = 0; i < m.length; i++) {
-				System.out.println("[TOP]" + m[i][0] + " - " + m[i][1]);
-			}
-		}
-	}
-
-
+	
 	//------------------------------------------------------------
 	// Nested Class
 	//------------------------------------------------------------
@@ -317,7 +233,7 @@ public class Activator implements BundleActivator {
 		 */
 		public Object addingBundle(Bundle bundle, BundleEvent event) {
 			String key = createBundleKey(bundle);
-			performanceData.put(key, new Long[]{System.currentTimeMillis(), 0L, -1L});
+			performanceData.put(key, new Long[]{System.nanoTime(), 0L, -1L});
 			System.out.println("[ADD] " + key + " - STATE: " + stateAsString(bundle));
 			return bundle;
 		}
@@ -335,7 +251,7 @@ public class Activator implements BundleActivator {
 
 				//Updates performance data structure.
 				Long[] time = performanceData.get(key);
-				time[1] = System.currentTimeMillis();
+				time[1] = System.nanoTime();
 				time[2] = time[1] - time[0];
 				performanceData.put(key, time);
 
@@ -345,8 +261,10 @@ public class Activator implements BundleActivator {
 					if(bundleClassLoader != null) {
 						URL bundleURL = bundleClassLoader.getResource("");
 						URL fileURL = FileLocator.toFileURL(bundleURL);
-						File root = new File(fileURL.toURI());
-						classpathData.put(key, getClassPathSize(root));
+						if(fileURL != null) {
+							File root = new File(fileURL.toURI());
+							classpathData.put(key, getClassPathSize(root));
+						}
 					}
 				}
 				catch(Exception e) {
@@ -366,11 +284,9 @@ public class Activator implements BundleActivator {
 			for(File f : folder.listFiles()) {
 				if(f.isFile()) {
 					size = (f.getName().endsWith(CLASS_EXTENSION)) ? size + 1 : size;
-					System.out.println("[FILE] " + f.getName());
 				}
 				else {
 					size += getClassPathSize(f);
-					System.out.println("[FOLDER] " + f.getName());
 				}
 			}
 
