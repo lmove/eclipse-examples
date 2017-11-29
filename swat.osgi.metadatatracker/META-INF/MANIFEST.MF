@@ -1,7 +1,7 @@
 Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: Bundle Tracker Example
-Bundle-SymbolicName: swat.osgi.performancetracker
+Bundle-SymbolicName: example.osgi.bundletracker
 Bundle-Version: 1.0.0
 Bundle-Activator: example.osgi.bundletracker.Activator
 Bundle-RequiredExecutionEnvironment: JavaSE-1.8

@@ -10,7 +10,7 @@
  *     Lina Ochoa - modifications to track performance and classpath size
  *******************************************************************************/
 
-package example.osgi.bundletracker;
+package swat.osgi.bundletracker;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -52,7 +52,6 @@ public class Activator implements BundleActivator {
 	//------------------------------------------------------------
 
 	private static Map<String,Long[]> performanceData;
-	private static Map<String,Integer> classpathData;
 	private static Map<Integer,String> bundleStates;
 	private static Map<Integer,String> bundleEventStates;
 	private OSGiBundleTracker bundleTracker;
@@ -71,7 +70,7 @@ public class Activator implements BundleActivator {
 		int trackStates = Bundle.STARTING | Bundle.STOPPING | Bundle.RESOLVED | Bundle.INSTALLED | Bundle.UNINSTALLED;
 
 		//Initialize maps with bundles data and constants.
-		initializeData();
+		performanceData = new HashMap<String, Long[]>();
 		initializeBundleStates();
 		initializeBundleEventStates();
 
@@ -85,10 +84,8 @@ public class Activator implements BundleActivator {
 	 */
 	public void stop(BundleContext context) throws Exception {
 		try {
-			System.out.println("Stopping Bundle Tracker");
-			classpathToCSV();
+			System.out.println("Stopping Performance Tracker");
 			performanceToCSV();
-			bundleStatesToCSV();
 			System.out.println("Metadata was printed.");
 
 			bundleTracker.close();
@@ -97,15 +94,6 @@ public class Activator implements BundleActivator {
 		catch(Exception e) {
 			e.printStackTrace();
 		}
-	}
-
-	/**
-	 * Initializes data structures related to performance and
-	 * classpath size information.
-	 */
-	private static void initializeData() {
-		classpathData = new HashMap<String,Integer>();
-		performanceData = new HashMap<String, Long[]>();
 	}
 
 	/**
@@ -156,25 +144,6 @@ public class Activator implements BundleActivator {
 	}
 
 	/**
-	 * Creates a CSV file with the classpath size of resolved
-	 * and non-fragment bundles.
-	 */
-	private void classpathToCSV() {
-		StringBuilder builder = new StringBuilder();
-		builder.append("Bundle,Classpath Size\n");
-
-		Set<Entry<String,Integer>> classpaths = classpathData.entrySet();
-		Iterator<Entry<String,Integer>> it = classpaths.iterator();
-		Entry<String,Integer> entry = null;
-		while(it.hasNext()) {
-			entry = it.next();
-			builder.append(entry.getKey() + CSV_SEPARATOR + entry.getValue() + '\n');
-		}
-		
-		writeFile(DATA_FOLDER + "/classpath-info.csv", builder.toString());
-	}
-
-	/**
 	 * Creates a CSV file with the resolving performance of 
 	 * resolved bundles.
 	 */
@@ -191,18 +160,6 @@ public class Activator implements BundleActivator {
 		}
 		
 		writeFile(DATA_FOLDER + "/performance-info.csv", builder.toString());
-	}
-	
-	private void bundleStatesToCSV() {
-		StringBuilder builder = new StringBuilder();
-		builder.append("Bundle,State\n");
-		
-		Bundle[] bundles = bundleTracker.getBundles();
-		for(Bundle bundle : bundles) {
-			builder.append(createBundleKey(bundle) + CSV_SEPARATOR + stateAsString(bundle) + '\n');
-		}
-		
-		writeFile(DATA_FOLDER + "/bundles-info.csv", builder.toString());
 	}
 	
 	private void writeFile(String path, String content) {
@@ -269,72 +226,8 @@ public class Activator implements BundleActivator {
 				time[1] = System.nanoTime();
 				time[2] = time[1] - time[0];
 				performanceData.put(key, time);
-
-				//Updates classpath data structure.
-				try {
-					ClassLoader bundleClassLoader = (ClassLoader) getBundleClassLoader(bundle);
-					if(bundleClassLoader != null) {
-						URL bundleURL = bundleClassLoader.getResource("");
-						URL fileURL = FileLocator.toFileURL(bundleURL);
-						if(fileURL != null) {
-							File root = new File(fileURL.toURI());
-							classpathData.put(key, getClassPathSize(root));
-						}
-					}
-				}
-				catch(Exception e) {
-					e.printStackTrace();
-				}
 			}	
 			System.out.println("[MODIFIED] " + key + " - STATE: " + stateAsString(bundle));
 		}
-
-		/**
-		 * Computes the classpath size of a given folder (e.g. bundle root
-		 * folder). Class files are counted.
-		 */
-		private int getClassPathSize(File folder) {
-			int size = 0;
-
-			for(File f : folder.listFiles()) {
-				if(f.isFile()) {
-					size = (f.getName().endsWith(CLASS_EXTENSION)) ? size + 1 : size;
-				}
-				else {
-					size += getClassPathSize(f);
-				}
-			}
-
-			return size;
-		}
-
-		/**
-		 * Returns the classloader of a given bundle.
-		 */
-		private ClassLoader getBundleClassLoader(Bundle bundle) {
-			ClassLoader classloader = null;
-			String key = createBundleKey(bundle);
-
-			try {
-				String path = System.getProperty("user.dir") + "/plugins/" + key + JAR_EXTENSION;
-				InputStream inputStream = new FileInputStream(path);
-				JarInputStream jarStream = new JarInputStream(inputStream);
-				JarEntry entry = jarStream.getNextJarEntry();
-
-				while(entry != null && classloader == null) {
-					if(!entry.isDirectory() && entry.getName().endsWith(CLASS_EXTENSION)) {
-						String randomClass = (entry.getName().substring(0,entry.getName().lastIndexOf(CLASS_EXTENSION))).replace("/", ".");
-						classloader = bundle.loadClass(randomClass).getClassLoader();
-					}
-					entry = jarStream.getNextJarEntry();
-				}
-				return classloader;
-			}
-			catch(Exception e) {
-				//This is a bundle fragment. Returns null.
-				return classloader;
-			}
-		}
 	}
-
 }
