@@ -10,7 +10,7 @@
  *     Lina Ochoa - modifications to track performance and classpath size
  *******************************************************************************/
 
-package swat.osgi.bundletracker;
+package swat.osgi.metadatatracker;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -31,7 +31,6 @@ import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.BundleEvent;
-import org.osgi.framework.BundleException;
 import org.osgi.util.tracker.BundleTracker;
 import org.osgi.util.tracker.BundleTrackerCustomizer;
 
@@ -53,7 +52,6 @@ public class Activator implements BundleActivator {
 
 	private static Map<String,Integer> resolvedData;
 	private static Map<String,Integer> classpathData;
-	private static int resolvedBundles;
 	private static Map<Integer,String> bundleStates;
 	private static Map<Integer,String> bundleEventStates;
 	private OSGiBundleTracker bundleTracker;
@@ -68,11 +66,10 @@ public class Activator implements BundleActivator {
 	 * The OSGi bundle tracker is initialized.
 	 */
 	public void start(BundleContext context) throws Exception {
-		System.out.println("Starting Bundle Tracker");
+		System.out.println("Starting Metadata Tracker");
 		int trackStates = Bundle.STARTING | Bundle.STOPPING | Bundle.RESOLVED | Bundle.INSTALLED | Bundle.UNINSTALLED;
 
 		//Initialize maps with bundles data and constants.
-		resolvedBundles = 0;
 		initializeData();
 		initializeBundleStates();
 		initializeBundleEventStates();
@@ -87,7 +84,7 @@ public class Activator implements BundleActivator {
 	 */
 	public void stop(BundleContext context) throws Exception {
 		try {
-			System.out.println("Stopping Bundle Tracker");
+			System.out.println("Stopping Metadata Tracker");
 			
 			bundleStatesToCSV();
 			classpathToCSV();

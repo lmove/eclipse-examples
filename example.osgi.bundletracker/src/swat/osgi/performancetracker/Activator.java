@@ -10,7 +10,7 @@
  *     Lina Ochoa - modifications to track performance and classpath size
  *******************************************************************************/
 
-package swat.osgi.bundletracker;
+package swat.osgi.performancetracker;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -220,7 +220,6 @@ public class Activator implements BundleActivator {
 			String key = createBundleKey(bundle);
 
 			if(event.getType() == BundleEvent.RESOLVED) {
-
 				//Updates performance data structure.
 				Long[] time = performanceData.get(key);
 				time[1] = System.nanoTime();
