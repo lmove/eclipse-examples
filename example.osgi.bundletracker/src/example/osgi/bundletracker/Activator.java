@@ -31,6 +31,7 @@ import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.BundleEvent;
+import org.osgi.framework.BundleException;
 import org.osgi.util.tracker.BundleTracker;
 import org.osgi.util.tracker.BundleTrackerCustomizer;
 
@@ -87,6 +88,7 @@ public class Activator implements BundleActivator {
 			System.out.println("Stopping Bundle Tracker");
 			classpathToCSV();
 			performanceToCSV();
+			bundleStatesToCSV();
 			System.out.println("Metadata was printed.");
 
 			bundleTracker.close();
@@ -158,23 +160,58 @@ public class Activator implements BundleActivator {
 	 * and non-fragment bundles.
 	 */
 	private void classpathToCSV() {
+		StringBuilder builder = new StringBuilder();
+		builder.append("Bundle,Classpath Size\n");
+
+		Set<Entry<String,Integer>> classpaths = classpathData.entrySet();
+		Iterator<Entry<String,Integer>> it = classpaths.iterator();
+		Entry<String,Integer> entry = null;
+		while(it.hasNext()) {
+			entry = it.next();
+			builder.append(entry.getKey() + CSV_SEPARATOR + entry.getValue() + '\n');
+		}
+		
+		writeFile(DATA_FOLDER + "/classpath-info.csv", builder.toString());
+	}
+
+	/**
+	 * Creates a CSV file with the resolving performance of 
+	 * resolved bundles.
+	 */
+	private void performanceToCSV() {
+		StringBuilder builder = new StringBuilder();
+		builder.append("Bundle,Resolving Time\n");
+
+		Set<Entry<String, Long[]>> performance = performanceData.entrySet();
+		Iterator<Entry<String, Long[]>> it = performance.iterator();
+		Entry<String,Long[]> entry = null;
+		while(it.hasNext()) {
+			entry = it.next();
+			builder.append(entry.getKey() + CSV_SEPARATOR + entry.getValue()[2] + '\n');
+		}
+		
+		writeFile(DATA_FOLDER + "/performance-info.csv", builder.toString());
+	}
+	
+	private void bundleStatesToCSV() {
+		StringBuilder builder = new StringBuilder();
+		builder.append("Bundle,State\n");
+		
+		Bundle[] bundles = bundleTracker.getBundles();
+		for(Bundle bundle : bundles) {
+			builder.append(createBundleKey(bundle) + CSV_SEPARATOR + stateAsString(bundle) + '\n');
+		}
+		
+		writeFile(DATA_FOLDER + "/bundles-info.csv", builder.toString());
+	}
+	
+	private void writeFile(String path, String content) {
 		try {
-			File file = new File(DATA_FOLDER + "/classpath-info.csv");
+			File file = new File(path);
 			file.getParentFile().mkdirs();
 
 			PrintWriter writer = new PrintWriter(file);
-			StringBuilder builder = new StringBuilder();
-			builder.append("Bundle,Classpath Size\n");
-
-			Set<Entry<String,Integer>> classpaths = classpathData.entrySet();
-			Iterator<Entry<String,Integer>> it = classpaths.iterator();
-			Entry<String,Integer> entry = null;
-
-			while(it.hasNext()) {
-				entry = it.next();
-				builder.append(entry.getKey() + CSV_SEPARATOR + entry.getValue() + '\n');
-			}
-			writer.write(builder.toString());
+			writer.write(content);
 			writer.close();
 		}
 		catch(IOException e) {
@@ -183,34 +220,12 @@ public class Activator implements BundleActivator {
 	}
 
 	/**
-	 * Creates a CSV file with the resolving performance of 
-	 * resolved bundles.
+	 * Creates a bundle identifier: symbolicName_version
 	 */
-	private void performanceToCSV() {
-		try {
-			File file = new File(DATA_FOLDER + "/performance-info.csv");
-			file.getParentFile().mkdirs();
-
-			PrintWriter writer = new PrintWriter(file);
-			StringBuilder builder = new StringBuilder();
-			builder.append("Bundle,Resolving Time\n");
-
-			Set<Entry<String, Long[]>> performance = performanceData.entrySet();
-			Iterator<Entry<String, Long[]>> it = performance.iterator();
-			Entry<String,Long[]> entry = null;
-
-			while(it.hasNext()) {
-				entry = it.next();
-				builder.append(entry.getKey() + CSV_SEPARATOR + entry.getValue()[2] + '\n');
-			}
-			writer.write(builder.toString());
-			writer.close();
-		}
-		catch(IOException e) {
-			e.printStackTrace();
-		}
+	protected static String createBundleKey(Bundle bundle) {
+		return bundle.getSymbolicName() + "_" + bundle.getVersion();
 	}
-
+	
 	
 	//------------------------------------------------------------
 	// Nested Class
@@ -319,13 +334,6 @@ public class Activator implements BundleActivator {
 				//This is a bundle fragment. Returns null.
 				return classloader;
 			}
-		}
-
-		/**
-		 * Creates a bundle identifier: symbolicName_version
-		 */
-		private String createBundleKey(Bundle bundle) {
-			return bundle.getSymbolicName() + "_" + bundle.getVersion();
 		}
 	}
 
