@@ -1,8 +1,8 @@
-eclipse-examples
+OSGI Trackers
 ================
-Code examples for OSGi & Eclipse plug-in development.
+OSGi framework performance and metadata trackers. This repository started as a fork project of the [eclipse-examples Github repo](https://github.com/evolanakis/eclipse-examples). It was modified in order to obtain specific tracking information of an OSGi framework, such as:
 
-- example.osgi.bundlelistener - Uses an OSGi BundleListener to track changes in a bundle's lifecycle (install, start, stop, uninstall, etc).
-- example.osgi.bundletracker - Uses an OSGi BundleTracker to track changes in a bundle's lifecycle (install, start, stop, uninstall, etc).
-- example.eclipse.bundlewatcher - Uses an Eclipse BundleWatcher to track changesof a bundle's lifecycle (install, start, stop, uninstall, etc) from the moment the OSGi environment is started.
+- **Performance data:** time taken by each bundle in the framework to change from an *INSTALLED* state to a *RESOLVED* state.
+- **Classpath size:** number of classes per bundle (including dependencies). Own and releated classloaders are considered.
+- **Resolving ordering:** order in which bundles are resolved in the framework.
 
