@@ -21,7 +21,6 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
@@ -95,14 +94,14 @@ public class Activator implements BundleActivator {
 			classpathToCSV();
 			classpathDependenciesToCSV();
 			resolvedBundlesToCSV();
-			
+
 			System.out.println("Metadata was printed.");
 
 			bundleTracker.close();
 			bundleTracker = null;
 		}
 		catch(Exception e) {
-			System.err.println(e.getMessage());
+			e.printStackTrace();
 		}
 	}
 
@@ -144,7 +143,10 @@ public class Activator implements BundleActivator {
 		bundleEventStates.put(BundleEvent.UNRESOLVED, "UNRESOLVED");
 		bundleEventStates.put(BundleEvent.UPDATED, "UPDATED");
 	}
-	
+
+	/**
+	 * Initializes the random classes map.
+	 */
 	private static void initializeRandomClasses() {
 		randomClasses = new HashMap<String,String[]>(); 
 		Properties properties = new Properties();
@@ -153,7 +155,7 @@ public class Activator implements BundleActivator {
 			properties.load(is);
 			Iterator<Entry<Object, Object>> it = properties.entrySet().iterator();
 			Entry<Object,Object> entry = null;
-			
+
 			while(it.hasNext()) {
 				entry = it.next();
 				String bundle = (String) entry.getKey();
@@ -162,7 +164,7 @@ public class Activator implements BundleActivator {
 			}
 		}
 		catch(IOException e) {
-			System.err.println("[ERRR] " + e.getMessage());
+			e.printStackTrace();
 		}
 	}
 
@@ -183,19 +185,25 @@ public class Activator implements BundleActivator {
 			(bundleEventStates.containsKey(event.getType())) ? bundleEventStates.get(event.getType()) :
 				"UNDEFINED";
 	}
-	
+
+	/**
+	 * Updates the classpath dfata structures:
+	 * - classpathData: considers only the bundle classpath size
+	 * - classpathDependenciesData: considers both bundle + dependencies
+	 *   classpath sizes.
+	 */
 	private static void updateClasspathData(Bundle bundle) {
 		try {
 			ClassLoader bundleClassLoader = (ClassLoader) getBundleClassLoader(bundle);
-			
+
 			if(bundleClassLoader != null) {
 				String key = createBundleKey(bundle);
 				int bundleCP = getClassloaderClassPathSize(bundleClassLoader);
 				classpathData.put(key, bundleCP);
-				
+
 				if(randomClasses.containsKey(key)) {
 					String[] classes = randomClasses.get(key);
-					
+
 					for(String c : classes) {
 						try {
 							ClassLoader dependencyClassLoader = bundleClassLoader.loadClass(c).getClassLoader();
@@ -212,10 +220,13 @@ public class Activator implements BundleActivator {
 			}
 		}
 		catch(Exception e) {
-			System.err.println("ERRRRR " + e.getMessage());
+			e.printStackTrace();
 		}
 	}
-	
+
+	/**
+	 * Gets the classpath size of a bundle given it classloader.
+	 */
 	private static int getClassloaderClassPathSize(ClassLoader classLoader) {
 		try {
 			URL bundleURL = classLoader.getResource("");
@@ -233,7 +244,7 @@ public class Activator implements BundleActivator {
 			return 0;
 		}
 	}
-	
+
 	/**
 	 * Computes the classpath size of a given folder (e.g. bundle root
 	 * folder). Class files are counted.
@@ -250,7 +261,7 @@ public class Activator implements BundleActivator {
 		}
 		return size;
 	}
-	
+
 	/**
 	 * Creates a CSV file with the classpath size of resolved
 	 * and non-fragment bundles.
@@ -258,43 +269,43 @@ public class Activator implements BundleActivator {
 	private static void classpathToCSV() {
 		StringBuilder builder = new StringBuilder();
 		builder.append("Bundle,Classpath Size\n");
-		
+
 		Set<Entry<String,Integer>> classpaths = classpathData.entrySet();
 		Iterator<Entry<String,Integer>> it = classpaths.iterator();
 		Entry<String,Integer> entry = null;
-		
+
 		while(it.hasNext()) {
 			entry = it.next();
 			builder.append(entry.getKey() + CSV_SEPARATOR + entry.getValue() + '\n');
 		}
-		
+
 		writeFile(DATA_FOLDER + "/classpath-info.csv", builder.toString());
 	}
-	
+
 	/**
 	 * Creates a CSV file with the classpath size of resolved
-	 * and non-fragment bundles.
+	 * and non-fragment bundles. Dependencies are included.
 	 */
 	private static void classpathDependenciesToCSV() {
 		StringBuilder builder = new StringBuilder();
 		builder.append("Bundle,Classpath Size\n");
-		
+
 		Set<Entry<String,Integer>> classpaths = classpathDependenciesData.entrySet();
 		Iterator<Entry<String,Integer>> it = classpaths.iterator();
 		Entry<String,Integer> entry = null;
-		
+
 		while(it.hasNext()) {
 			entry = it.next();
 			builder.append(entry.getKey() + CSV_SEPARATOR + entry.getValue() + '\n');
 		}
-		
+
 		writeFile(DATA_FOLDER + "/classpath-dependencies-info.csv", builder.toString());
 	}
-	
-	
+
+
 	/**
-	 * Creates a CSV file with the resolving performance of 
-	 * resolved bundles.
+	 * Creates a CSV file with the ordering in which bundles
+	 * are resolved.
 	 */
 	private void resolvedBundlesToCSV() {
 		StringBuilder builder = new StringBuilder();
@@ -303,27 +314,30 @@ public class Activator implements BundleActivator {
 		Set<Entry<String,Integer>> performance = resolvedData.entrySet();
 		Iterator<Entry<String,Integer>> it = performance.iterator();
 		Entry<String,Integer> entry = null;
-		
+
 		while(it.hasNext()) {
 			entry = it.next();
 			builder.append(entry.getKey() + CSV_SEPARATOR + entry.getValue() + '\n');
 		}
-		
+
 		writeFile(DATA_FOLDER + "/resolved-bundles-info.csv", builder.toString());
 	}
-	
+
+	/**
+	 * Creates a CSV file with the final bundles state. 
+	 */
 	private void bundleStatesToCSV() {
 		StringBuilder builder = new StringBuilder();
 		builder.append("Bundle,State\n");
-		
+
 		Bundle[] bundles = bundleTracker.getBundles();
 		for(Bundle bundle : bundles) {
 			builder.append(createBundleKey(bundle) + CSV_SEPARATOR + stateAsString(bundle) + '\n');
 		}
-		
+
 		writeFile(DATA_FOLDER + "/bundles-info.csv", builder.toString());
 	}
-	
+
 	/**
 	 * Returns the classloader of a given bundle.
 	 */
@@ -351,7 +365,11 @@ public class Activator implements BundleActivator {
 			return classloader;
 		}
 	}
-	
+
+	/**
+	 * Writes a file given a target path and a content.
+	 * Parent folders are created.
+	 */
 	private static void writeFile(String path, String content) {
 		try {
 			File file = new File(path);
@@ -362,7 +380,7 @@ public class Activator implements BundleActivator {
 			writer.close();
 		}
 		catch(IOException e) {
-			System.err.println(e.getMessage());
+			e.printStackTrace();
 		}
 	}
 
@@ -372,8 +390,8 @@ public class Activator implements BundleActivator {
 	protected static String createBundleKey(Bundle bundle) {
 		return bundle.getSymbolicName() + "_" + bundle.getVersion();
 	}
-	
-	
+
+
 	//------------------------------------------------------------
 	// Nested Class
 	//------------------------------------------------------------
