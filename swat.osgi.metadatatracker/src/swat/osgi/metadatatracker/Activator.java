@@ -17,11 +17,14 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Properties;
 import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
@@ -52,6 +55,8 @@ public class Activator implements BundleActivator {
 
 	private static Map<String,Integer> resolvedData;
 	private static Map<String,Integer> classpathData;
+	private static Map<String,Integer> classpathDependenciesData;
+	private static Map<String, String[]> randomClasses;
 	private static Map<Integer,String> bundleStates;
 	private static Map<Integer,String> bundleEventStates;
 	private OSGiBundleTracker bundleTracker;
@@ -73,6 +78,7 @@ public class Activator implements BundleActivator {
 		initializeData();
 		initializeBundleStates();
 		initializeBundleEventStates();
+		initializeRandomClasses();
 
 		bundleTracker = new OSGiBundleTracker(context, trackStates, null);
 		bundleTracker.open();
@@ -85,9 +91,9 @@ public class Activator implements BundleActivator {
 	public void stop(BundleContext context) throws Exception {
 		try {
 			System.out.println("Stopping Metadata Tracker");
-			
 			bundleStatesToCSV();
 			classpathToCSV();
+			//classpathWithDependenciesToCSV();
 			resolvedBundlesToCSV();
 			
 			System.out.println("Metadata was printed.");
@@ -96,7 +102,7 @@ public class Activator implements BundleActivator {
 			bundleTracker = null;
 		}
 		catch(Exception e) {
-			e.printStackTrace();
+			System.err.println(e.getMessage());
 		}
 	}
 
@@ -106,6 +112,7 @@ public class Activator implements BundleActivator {
 	 */
 	private static void initializeData() {
 		classpathData = new HashMap<String,Integer>();
+		classpathDependenciesData = new HashMap<String,Integer>();
 		resolvedData = new HashMap<String, Integer>();
 	}
 
@@ -137,6 +144,27 @@ public class Activator implements BundleActivator {
 		bundleEventStates.put(BundleEvent.UNRESOLVED, "UNRESOLVED");
 		bundleEventStates.put(BundleEvent.UPDATED, "UPDATED");
 	}
+	
+	private static void initializeRandomClasses() {
+		randomClasses = new HashMap<String,String[]>(); 
+		Properties properties = new Properties();
+		try {
+			InputStream is = new FileInputStream(DATA_FOLDER + "/random-classes-classloaders.properties");
+			properties.load(is);
+			Iterator<Entry<Object, Object>> it = properties.entrySet().iterator();
+			Entry<Object,Object> entry = null;
+			
+			while(it.hasNext()) {
+				entry = it.next();
+				String bundle = (String) entry.getKey();
+				String[] classes = ((String) entry.getValue()).split(",");
+				randomClasses.put(bundle, classes);
+			}
+		}
+		catch(IOException e) {
+			System.err.println("[ERRR] " + e.getMessage());
+		}
+	}
 
 	/**
 	 * Returns a string representing the state of the bundle.
@@ -160,10 +188,10 @@ public class Activator implements BundleActivator {
 	 * Creates a CSV file with the classpath size of resolved
 	 * and non-fragment bundles.
 	 */
-	private void classpathToCSV() {
+	private static void classpathToCSV() {
 		StringBuilder builder = new StringBuilder();
 		builder.append("Bundle,Classpath Size\n");
-
+		
 		Set<Entry<String,Integer>> classpaths = classpathData.entrySet();
 		Iterator<Entry<String,Integer>> it = classpaths.iterator();
 		Entry<String,Integer> entry = null;
@@ -174,7 +202,60 @@ public class Activator implements BundleActivator {
 		
 		writeFile(DATA_FOLDER + "/classpath-info.csv", builder.toString());
 	}
-
+	
+	private static void updateClasspathData(Bundle bundle) {
+		try {
+			ClassLoader bundleClassLoader = (ClassLoader) getBundleClassLoader(bundle);
+			
+			if(bundleClassLoader != null) {
+				String key = createBundleKey(bundle);
+				URL bundleURL = bundleClassLoader.getResource("");
+				URL fileURL = FileLocator.toFileURL(bundleURL);
+				
+				if(fileURL != null) {
+					File root = new File(fileURL.toURI());
+					classpathData.put(key, getClassPathSize(root));
+				}
+				
+				if(randomClasses.containsKey(key)) {
+					String[] classes = randomClasses.get(key);
+					
+					for(String c : classes) {
+						try {
+							ClassLoader dependencyClassLoader = bundleClassLoader.loadClass(c).getClassLoader();
+							if(dependencyClassLoader != null) {
+								System.out.println("[BUNDLE] " + key + " : " + bundleClassLoader.toString() + " - " + dependencyClassLoader.toString());
+							}
+						}
+						catch(Exception e) {
+							continue;
+						}
+					}
+				}
+			}
+		}
+		catch(Exception e) {
+			System.err.println("ERRRRR " + e.getMessage());
+		}
+	}
+	
+	/**
+	 * Computes the classpath size of a given folder (e.g. bundle root
+	 * folder). Class files are counted.
+	 */
+	private static int getClassPathSize(File folder) {
+		int size = 0;
+		for(File f : folder.listFiles()) {
+			if(f.isFile()) {
+				size = (f.getName().endsWith(CLASS_EXTENSION)) ? size + 1 : size;
+			}
+			else {
+				size += getClassPathSize(f);
+			}
+		}
+		return size;
+	}
+	
 	/**
 	 * Creates a CSV file with the resolving performance of 
 	 * resolved bundles.
@@ -206,7 +287,37 @@ public class Activator implements BundleActivator {
 		writeFile(DATA_FOLDER + "/bundles-info.csv", builder.toString());
 	}
 	
-	private void writeFile(String path, String content) {
+	/**
+	 * Returns the classloader of a given bundle.
+	 */
+	protected static ClassLoader getBundleClassLoader(Bundle bundle) {
+		ClassLoader classloader = null;
+		String key = createBundleKey(bundle);
+
+		try {
+			String path = System.getProperty("user.dir") + "/plugins/" + key + JAR_EXTENSION;
+			InputStream inputStream = new FileInputStream(path);
+			JarInputStream jarStream = new JarInputStream(inputStream);
+			JarEntry entry = jarStream.getNextJarEntry();
+
+			while(entry != null && classloader == null) {
+				if(!entry.isDirectory() && entry.getName().endsWith(CLASS_EXTENSION)) {
+					String randomClass = (entry.getName().substring(0,entry.getName().lastIndexOf(CLASS_EXTENSION))).replace("/", ".");
+					classloader = bundle.loadClass(randomClass).getClassLoader();
+				}
+				entry = jarStream.getNextJarEntry();
+			}
+			return classloader;
+		}
+		catch(Exception e) {
+			//This is a bundle fragment. Returns null.
+			return classloader;
+		}
+	}
+	
+	
+	
+	private static void writeFile(String path, String content) {
 		try {
 			File file = new File(path);
 			file.getParentFile().mkdirs();
@@ -216,7 +327,7 @@ public class Activator implements BundleActivator {
 			writer.close();
 		}
 		catch(IOException e) {
-			e.printStackTrace();
+			System.err.println(e.getMessage());
 		}
 	}
 
@@ -265,71 +376,9 @@ public class Activator implements BundleActivator {
 			if(event.getType() == BundleEvent.RESOLVED) {
 				//Update number of resolved bundles in data structure.
 				resolvedData.put(key, resolvedData.size());
-
-				//Updates classpath data structure.
-				try {
-					ClassLoader bundleClassLoader = (ClassLoader) getBundleClassLoader(bundle);
-					if(bundleClassLoader != null) {
-						URL bundleURL = bundleClassLoader.getResource("");
-						URL fileURL = FileLocator.toFileURL(bundleURL);
-						if(fileURL != null) {
-							File root = new File(fileURL.toURI());
-							classpathData.put(key, getClassPathSize(root));
-						}
-					}
-				}
-				catch(Exception e) {
-					e.printStackTrace();
-				}
+				updateClasspathData(bundle);
 			}	
 			System.out.println("[MODIFIED] " + key + " - STATE: " + stateAsString(bundle));
-		}
-
-		/**
-		 * Computes the classpath size of a given folder (e.g. bundle root
-		 * folder). Class files are counted.
-		 */
-		private int getClassPathSize(File folder) {
-			int size = 0;
-
-			for(File f : folder.listFiles()) {
-				if(f.isFile()) {
-					size = (f.getName().endsWith(CLASS_EXTENSION)) ? size + 1 : size;
-				}
-				else {
-					size += getClassPathSize(f);
-				}
-			}
-
-			return size;
-		}
-
-		/**
-		 * Returns the classloader of a given bundle.
-		 */
-		private ClassLoader getBundleClassLoader(Bundle bundle) {
-			ClassLoader classloader = null;
-			String key = createBundleKey(bundle);
-
-			try {
-				String path = System.getProperty("user.dir") + "/plugins/" + key + JAR_EXTENSION;
-				InputStream inputStream = new FileInputStream(path);
-				JarInputStream jarStream = new JarInputStream(inputStream);
-				JarEntry entry = jarStream.getNextJarEntry();
-
-				while(entry != null && classloader == null) {
-					if(!entry.isDirectory() && entry.getName().endsWith(CLASS_EXTENSION)) {
-						String randomClass = (entry.getName().substring(0,entry.getName().lastIndexOf(CLASS_EXTENSION))).replace("/", ".");
-						classloader = bundle.loadClass(randomClass).getClassLoader();
-					}
-					entry = jarStream.getNextJarEntry();
-				}
-				return classloader;
-			}
-			catch(Exception e) {
-				//This is a bundle fragment. Returns null.
-				return classloader;
-			}
 		}
 	}
 
