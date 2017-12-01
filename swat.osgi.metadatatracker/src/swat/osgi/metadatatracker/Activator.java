@@ -93,7 +93,7 @@ public class Activator implements BundleActivator {
 			System.out.println("Stopping Metadata Tracker");
 			bundleStatesToCSV();
 			classpathToCSV();
-			//classpathWithDependenciesToCSV();
+			classpathDependenciesToCSV();
 			resolvedBundlesToCSV();
 			
 			System.out.println("Metadata was printed.");
@@ -183,25 +183,6 @@ public class Activator implements BundleActivator {
 			(bundleEventStates.containsKey(event.getType())) ? bundleEventStates.get(event.getType()) :
 				"UNDEFINED";
 	}
-
-	/**
-	 * Creates a CSV file with the classpath size of resolved
-	 * and non-fragment bundles.
-	 */
-	private static void classpathToCSV() {
-		StringBuilder builder = new StringBuilder();
-		builder.append("Bundle,Classpath Size\n");
-		
-		Set<Entry<String,Integer>> classpaths = classpathData.entrySet();
-		Iterator<Entry<String,Integer>> it = classpaths.iterator();
-		Entry<String,Integer> entry = null;
-		while(it.hasNext()) {
-			entry = it.next();
-			builder.append(entry.getKey() + CSV_SEPARATOR + entry.getValue() + '\n');
-		}
-		
-		writeFile(DATA_FOLDER + "/classpath-info.csv", builder.toString());
-	}
 	
 	private static void updateClasspathData(Bundle bundle) {
 		try {
@@ -209,13 +190,8 @@ public class Activator implements BundleActivator {
 			
 			if(bundleClassLoader != null) {
 				String key = createBundleKey(bundle);
-				URL bundleURL = bundleClassLoader.getResource("");
-				URL fileURL = FileLocator.toFileURL(bundleURL);
-				
-				if(fileURL != null) {
-					File root = new File(fileURL.toURI());
-					classpathData.put(key, getClassPathSize(root));
-				}
+				int bundleCP = getClassloaderClassPathSize(bundleClassLoader);
+				classpathData.put(key, bundleCP);
 				
 				if(randomClasses.containsKey(key)) {
 					String[] classes = randomClasses.get(key);
@@ -224,18 +200,37 @@ public class Activator implements BundleActivator {
 						try {
 							ClassLoader dependencyClassLoader = bundleClassLoader.loadClass(c).getClassLoader();
 							if(dependencyClassLoader != null) {
-								System.out.println("[BUNDLE] " + key + " : " + bundleClassLoader.toString() + " - " + dependencyClassLoader.toString());
+								bundleCP += getClassloaderClassPathSize(dependencyClassLoader);
 							}
 						}
 						catch(Exception e) {
 							continue;
 						}
 					}
+					classpathDependenciesData.put(key, bundleCP);
 				}
 			}
 		}
 		catch(Exception e) {
 			System.err.println("ERRRRR " + e.getMessage());
+		}
+	}
+	
+	private static int getClassloaderClassPathSize(ClassLoader classLoader) {
+		try {
+			URL bundleURL = classLoader.getResource("");
+			URL fileURL = FileLocator.toFileURL(bundleURL);
+			if(fileURL != null) {
+				File root = new File(fileURL.toURI());
+				return getClassPathSize(root);
+			}
+			else {
+				return 0;
+			}
+		} 
+		catch (IOException | URISyntaxException e) {
+			e.printStackTrace();
+			return 0;
 		}
 	}
 	
@@ -257,6 +252,47 @@ public class Activator implements BundleActivator {
 	}
 	
 	/**
+	 * Creates a CSV file with the classpath size of resolved
+	 * and non-fragment bundles.
+	 */
+	private static void classpathToCSV() {
+		StringBuilder builder = new StringBuilder();
+		builder.append("Bundle,Classpath Size\n");
+		
+		Set<Entry<String,Integer>> classpaths = classpathData.entrySet();
+		Iterator<Entry<String,Integer>> it = classpaths.iterator();
+		Entry<String,Integer> entry = null;
+		
+		while(it.hasNext()) {
+			entry = it.next();
+			builder.append(entry.getKey() + CSV_SEPARATOR + entry.getValue() + '\n');
+		}
+		
+		writeFile(DATA_FOLDER + "/classpath-info.csv", builder.toString());
+	}
+	
+	/**
+	 * Creates a CSV file with the classpath size of resolved
+	 * and non-fragment bundles.
+	 */
+	private static void classpathDependenciesToCSV() {
+		StringBuilder builder = new StringBuilder();
+		builder.append("Bundle,Classpath Size\n");
+		
+		Set<Entry<String,Integer>> classpaths = classpathDependenciesData.entrySet();
+		Iterator<Entry<String,Integer>> it = classpaths.iterator();
+		Entry<String,Integer> entry = null;
+		
+		while(it.hasNext()) {
+			entry = it.next();
+			builder.append(entry.getKey() + CSV_SEPARATOR + entry.getValue() + '\n');
+		}
+		
+		writeFile(DATA_FOLDER + "/classpath-dependencies-info.csv", builder.toString());
+	}
+	
+	
+	/**
 	 * Creates a CSV file with the resolving performance of 
 	 * resolved bundles.
 	 */
@@ -267,6 +303,7 @@ public class Activator implements BundleActivator {
 		Set<Entry<String,Integer>> performance = resolvedData.entrySet();
 		Iterator<Entry<String,Integer>> it = performance.iterator();
 		Entry<String,Integer> entry = null;
+		
 		while(it.hasNext()) {
 			entry = it.next();
 			builder.append(entry.getKey() + CSV_SEPARATOR + entry.getValue() + '\n');
@@ -314,8 +351,6 @@ public class Activator implements BundleActivator {
 			return classloader;
 		}
 	}
-	
-	
 	
 	private static void writeFile(String path, String content) {
 		try {
