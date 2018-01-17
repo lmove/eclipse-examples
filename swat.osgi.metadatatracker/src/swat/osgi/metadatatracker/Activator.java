@@ -195,25 +195,22 @@ public class Activator implements BundleActivator {
 	 *   classpath sizes.
 	 */
 	protected static void updateClasspathData(Bundle bundle) {
-		BundleWiring bw = bundle.adapt(BundleWiring.class);
 		String key = createBundleKey(bundle);
+		BundleWiring bw = bundle.adapt(BundleWiring.class);
 		int classpathSize = getBundleClaspathSize(bundle);
 		
 		// Insert the classpath size of the studied bundle (without dependencies).
 		classpathData.put(key, classpathSize);
 		
-		System.out.println("[IMPORT-PACKAGES] |bundle://eclipse/" + bundle.getSymbolicName() + "/" + bundle.getVersion().toString() + "|");
 		for(BundleWire wire : bw.getRequiredWires("osgi.wiring.package")) {
-			String pack = (String) wire.getCapability().getAttributes().get("osgi.wiring.package");
+			// To get the package name uncomment the following line:
+			//String pack = (String) wire.getCapability().getAttributes().get("osgi.wiring.package");
 			Bundle b = wire.getProviderWiring().getBundle();
 			classpathSize += getBundleClaspathSize(b);
-			System.out.println("|bundle://eclipse/" + b.getSymbolicName() + "/" + b.getVersion().toString() + "|" + " - " + pack);
 		}
-		System.out.println("[REQUIRED-BUNDLES]");
 		for(BundleWire wire : bw.getRequiredWires("osgi.wiring.bundle")) {
 			Bundle b = wire.getProviderWiring().getBundle();
 			classpathSize += getBundleClaspathSize(b);
-			System.out.println("|bundle://eclipse/" + b.getSymbolicName() + "/" + b.getVersion().toString() + "|");
 		}
 		
 		// Insert once all dependencies have been evaluated.
@@ -225,8 +222,9 @@ public class Activator implements BundleActivator {
 	 */
 	private static int getBundleClaspathSize(Bundle bundle) {
 		try {
-			ClassLoader bundleClassLoader = (ClassLoader) getBundleClassLoader(bundle);
-			return getClassloaderClassPathSize(bundleClassLoader);
+			//ClassLoader bundleClassLoader = (ClassLoader) getBundleClassLoader(bundle);
+			//return getClassloaderClassPathSize(bundleClassLoader);
+			return getClassloaderClassPathSize(bundle);
 		}
 		catch(Exception e) {
 			return 0;
@@ -236,7 +234,7 @@ public class Activator implements BundleActivator {
 	/**
 	 * Gets the classpath size of a bundle given it classloader.
 	 */
-	private static int getClassloaderClassPathSize(ClassLoader classLoader) {
+	private static int getClassloaderClassPathSize(Bundle classLoader) {
 		try {
 			URL bundleURL = classLoader.getResource("");
 			URL fileURL = FileLocator.toFileURL(bundleURL);
@@ -249,7 +247,6 @@ public class Activator implements BundleActivator {
 			}
 		} 
 		catch (IOException | URISyntaxException e) {
-			e.printStackTrace();
 			return 0;
 		}
 	}
@@ -349,11 +346,12 @@ public class Activator implements BundleActivator {
 
 	/**
 	 * Returns the classloader of a given bundle.
+	 * TODO: Unnecessary - erase?
 	 */
 	protected static ClassLoader getBundleClassLoader(Bundle bundle) {
 		ClassLoader classloader = null;
 		String key = createBundleKey(bundle);
-
+		
 		try {
 			String path = System.getProperty("user.dir") + "/plugins/" + key + JAR_EXTENSION;
 			InputStream inputStream = new FileInputStream(path);
@@ -361,12 +359,13 @@ public class Activator implements BundleActivator {
 			JarEntry entry = jarStream.getNextJarEntry();
 
 			while(entry != null && classloader == null) {
-				if(!entry.isDirectory() && entry.getName().endsWith(CLASS_EXTENSION)) {
+				if(!entry.isDirectory() && entry.getName().endsWith(CLASS_EXTENSION) && !entry.getName().contains("$")) {
 					String randomClass = (entry.getName().substring(0,entry.getName().lastIndexOf(CLASS_EXTENSION))).replace("/", ".");
 					classloader = bundle.loadClass(randomClass).getClassLoader();
 				}
 				entry = jarStream.getNextJarEntry();
 			}
+			
 			return classloader;
 		}
 		catch(Exception e) {
