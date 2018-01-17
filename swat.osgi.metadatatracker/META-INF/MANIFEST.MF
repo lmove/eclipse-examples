@@ -9,5 +9,6 @@ Bundle-ActivationPolicy: lazy
 Bundle-Vendor: EclipseSource
 Import-Package: org.eclipse.core.runtime;version="3.5.0";resolution:=optional,
  org.osgi.framework,
+ org.osgi.framework.wiring;version="1.2.0",
  org.osgi.util.tracker;version="1.5.1"
 DynamicImport-Package: org.eclipse.core.runtime;version="3.5.0"

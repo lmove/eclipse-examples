@@ -33,6 +33,8 @@ import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.BundleEvent;
+import org.osgi.framework.wiring.BundleWire;
+import org.osgi.framework.wiring.BundleWiring;
 import org.osgi.util.tracker.BundleTracker;
 import org.osgi.util.tracker.BundleTrackerCustomizer;
 
@@ -55,7 +57,7 @@ public class Activator implements BundleActivator {
 	private static Map<String,Integer> resolvedData;
 	private static Map<String,Integer> classpathData;
 	private static Map<String,Integer> classpathDependenciesData;
-	private static Map<String, String[]> randomClasses;
+	private static Map<String, String> randomClasses;
 	private static Map<Integer,String> bundleStates;
 	private static Map<Integer,String> bundleEventStates;
 	private OSGiBundleTracker bundleTracker;
@@ -148,7 +150,7 @@ public class Activator implements BundleActivator {
 	 * Initializes the random classes map.
 	 */
 	private static void initializeRandomClasses() {
-		randomClasses = new HashMap<String,String[]>(); 
+		randomClasses = new HashMap<String,String>(); 
 		Properties properties = new Properties();
 		try {
 			InputStream is = new FileInputStream(DATA_FOLDER + "/random-classes-classloaders.properties");
@@ -159,7 +161,7 @@ public class Activator implements BundleActivator {
 			while(it.hasNext()) {
 				entry = it.next();
 				String bundle = (String) entry.getKey();
-				String[] classes = ((String) entry.getValue()).split(",");
+				String classes = (String) entry.getValue();
 				randomClasses.put(bundle, classes);
 			}
 		}
@@ -176,7 +178,7 @@ public class Activator implements BundleActivator {
 			(bundleStates.containsKey(bundle.getState())) ? bundleStates.get(bundle.getState()) :
 				"UNDEFINED";
 	}
-
+	
 	/**
 	 * Returns a string representing the state of the bundle event.
 	 */
@@ -192,38 +194,45 @@ public class Activator implements BundleActivator {
 	 * - classpathDependenciesData: considers both bundle + dependencies
 	 *   classpath sizes.
 	 */
-	private static void updateClasspathData(Bundle bundle) {
+	protected static void updateClasspathData(Bundle bundle) {
+		BundleWiring bw = bundle.adapt(BundleWiring.class);
+		String key = createBundleKey(bundle);
+		int classpathSize = getBundleClaspathSize(bundle);
+		
+		// Insert the classpath size of the studied bundle (without dependencies).
+		classpathData.put(key, classpathSize);
+		
+		System.out.println("[IMPORT-PACKAGES] |bundle://eclipse/" + bundle.getSymbolicName() + "/" + bundle.getVersion().toString() + "|");
+		for(BundleWire wire : bw.getRequiredWires("osgi.wiring.package")) {
+			String pack = (String) wire.getCapability().getAttributes().get("osgi.wiring.package");
+			Bundle b = wire.getProviderWiring().getBundle();
+			classpathSize += getBundleClaspathSize(b);
+			System.out.println("|bundle://eclipse/" + b.getSymbolicName() + "/" + b.getVersion().toString() + "|" + " - " + pack);
+		}
+		System.out.println("[REQUIRED-BUNDLES]");
+		for(BundleWire wire : bw.getRequiredWires("osgi.wiring.bundle")) {
+			Bundle b = wire.getProviderWiring().getBundle();
+			classpathSize += getBundleClaspathSize(b);
+			System.out.println("|bundle://eclipse/" + b.getSymbolicName() + "/" + b.getVersion().toString() + "|");
+		}
+		
+		// Insert once all dependencies have been evaluated.
+		classpathDependenciesData.put(key, classpathSize);
+	}
+	
+	/**
+	 * Gets the classpath size of a given bundle.
+	 */
+	private static int getBundleClaspathSize(Bundle bundle) {
 		try {
 			ClassLoader bundleClassLoader = (ClassLoader) getBundleClassLoader(bundle);
-
-			if(bundleClassLoader != null) {
-				String key = createBundleKey(bundle);
-				int bundleCP = getClassloaderClassPathSize(bundleClassLoader);
-				classpathData.put(key, bundleCP);
-
-				if(randomClasses.containsKey(key)) {
-					String[] classes = randomClasses.get(key);
-
-					for(String c : classes) {
-						try {
-							ClassLoader dependencyClassLoader = bundleClassLoader.loadClass(c).getClassLoader();
-							if(dependencyClassLoader != null) {
-								bundleCP += getClassloaderClassPathSize(dependencyClassLoader);
-							}
-						}
-						catch(Exception e) {
-							continue;
-						}
-					}
-					classpathDependenciesData.put(key, bundleCP);
-				}
-			}
+			return getClassloaderClassPathSize(bundleClassLoader);
 		}
 		catch(Exception e) {
-			e.printStackTrace();
+			return 0;
 		}
 	}
-
+	
 	/**
 	 * Gets the classpath size of a bundle given it classloader.
 	 */
