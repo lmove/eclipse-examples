@@ -206,15 +206,12 @@ public class Activator implements BundleActivator {
 		public Object addingBundle(Bundle bundle, BundleEvent event) {
 			String key = createBundleKey(bundle);
 			performanceData.put(key, new Long[]{System.nanoTime(), 0L, -1L});
-			System.out.println("[ADD] " + key + " - STATE: " + stateAsString(bundle));
+			//System.out.println("[ADD] " + key + " - STATE: " + stateAsString(bundle));
 			return bundle;
 		}
 
 		/**
-		 * Sets bundle classpath size (in a Resolved state a classloader is 
-		 * assigned to a bundle).
-		 * Sets ResolvedTime and ResolvingTimeDelta slots in the performance
-		 * data structure.
+		 * Sets bundle resolution performance.
 		 */
 		public void modifiedBundle(Bundle bundle, BundleEvent event, Object object) {
 			String key = createBundleKey(bundle);
@@ -226,7 +223,7 @@ public class Activator implements BundleActivator {
 				time[2] = time[1] - time[0];
 				performanceData.put(key, time);
 			}	
-			System.out.println("[MODIFIED] " + key + " - STATE: " + stateAsString(bundle));
+			//System.out.println("[MODIFIED] " + key + " - STATE: " + stateAsString(bundle));
 		}
 	}
 }
