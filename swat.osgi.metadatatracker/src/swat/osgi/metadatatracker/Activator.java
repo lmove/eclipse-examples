@@ -197,7 +197,7 @@ public class Activator implements BundleActivator {
 	protected static void updateClasspathData(Bundle bundle) {
 		String key = createBundleKey(bundle);
 		BundleWiring bw = bundle.adapt(BundleWiring.class);
-		int classpathSize = getBundleClaspathSize(bundle);
+		int classpathSize = getBundleClassPathSize(bundle);
 		
 		// Insert the classpath size of the studied bundle (without dependencies).
 		classpathData.put(key, classpathSize);
@@ -206,11 +206,11 @@ public class Activator implements BundleActivator {
 			// To get the package name uncomment the following line:
 			//String pack = (String) wire.getCapability().getAttributes().get("osgi.wiring.package");
 			Bundle b = wire.getProviderWiring().getBundle();
-			classpathSize += getBundleClaspathSize(b);
+			classpathSize += getBundleClassPathSize(b);
 		}
 		for(BundleWire wire : bw.getRequiredWires("osgi.wiring.bundle")) {
 			Bundle b = wire.getProviderWiring().getBundle();
-			classpathSize += getBundleClaspathSize(b);
+			classpathSize += getBundleClassPathSize(b);
 		}
 		
 		// Insert once all dependencies have been evaluated.
@@ -218,25 +218,15 @@ public class Activator implements BundleActivator {
 	}
 	
 	/**
-	 * Gets the classpath size of a given bundle.
-	 */
-	private static int getBundleClaspathSize(Bundle bundle) {
-		try {
-			//ClassLoader bundleClassLoader = (ClassLoader) getBundleClassLoader(bundle);
-			//return getClassloaderClassPathSize(bundleClassLoader);
-			return getClassloaderClassPathSize(bundle);
-		}
-		catch(Exception e) {
-			return 0;
-		}
-	}
-	
-	/**
 	 * Gets the classpath size of a bundle given it classloader.
+	 * Note 1: both with bundle.getResource("") and classloader.getResource("")
+	 * we obtain the same results.
+	 * Note 2: getResource() is preferred over getEntry(), since the 
+	 * first one refers to the classpath size.
 	 */
-	private static int getClassloaderClassPathSize(Bundle classLoader) {
+	private static int getBundleClassPathSize(Bundle bundle) {
 		try {
-			URL bundleURL = classLoader.getResource("");
+			URL bundleURL = bundle.getResource("");
 			URL fileURL = FileLocator.toFileURL(bundleURL);
 			if(fileURL != null) {
 				File root = new File(fileURL.toURI());
@@ -269,8 +259,7 @@ public class Activator implements BundleActivator {
 	}
 
 	/**
-	 * Creates a CSV file with the classpath size of resolved
-	 * and non-fragment bundles.
+	 * Creates a CSV file with the classpath size of resolved bundles.
 	 */
 	private static void classpathToCSV() {
 		StringBuilder builder = new StringBuilder();
@@ -415,9 +404,7 @@ public class Activator implements BundleActivator {
 		}
 
 		/**
-		 * Adds information to the performance data structure.
-		 * For the Double[]: [InstalledTime, ResolvedTime, ResolvingTimeDelta]
-		 * Sets InstalledTime slot.
+		 * Adds a bundle to the tracker.
 		 */
 		public Object addingBundle(Bundle bundle, BundleEvent event) {
 			String key = createBundleKey(bundle);
@@ -426,10 +413,9 @@ public class Activator implements BundleActivator {
 		}
 
 		/**
+		 * Sets bundle resolved order.
 		 * Sets bundle classpath size (in a Resolved state a classloader is 
 		 * assigned to a bundle).
-		 * Sets ResolvedTime and ResolvingTimeDelta slots in the performance
-		 * data structure.
 		 */
 		public void modifiedBundle(Bundle bundle, BundleEvent event, Object object) {
 			String key = createBundleKey(bundle);
