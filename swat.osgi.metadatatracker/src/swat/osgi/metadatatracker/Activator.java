@@ -54,12 +54,12 @@ public class Activator implements BundleActivator {
 	// Fields
 	//------------------------------------------------------------
 
-	private static Map<String,Integer> resolvedData;
-	private static Map<String,Integer> classpathData;
-	private static Map<String,Integer> classpathDependenciesData;
-	private static Map<String, String> randomClasses;
-	private static Map<Integer,String> bundleStates;
-	private static Map<Integer,String> bundleEventStates;
+	private Map<String,Integer> resolvedData;
+	private Map<String,Integer> classpathData;
+	private Map<String,Integer> classpathDependenciesData;
+	private Map<String, String> randomClasses;
+	private Map<Integer,String> bundleStates;
+	private Map<Integer,String> bundleEventStates;
 	private OSGiBundleTracker bundleTracker;
 
 
@@ -111,7 +111,7 @@ public class Activator implements BundleActivator {
 	 * Initializes data structures related to performance and
 	 * classpath size information.
 	 */
-	private static void initializeData() {
+	private void initializeData() {
 		classpathData = new HashMap<String,Integer>();
 		classpathDependenciesData = new HashMap<String,Integer>();
 		resolvedData = new HashMap<String, Integer>();
@@ -120,7 +120,7 @@ public class Activator implements BundleActivator {
 	/**
 	 * Initializes the bundle states map.
 	 */
-	private static void initializeBundleStates() {
+	private void initializeBundleStates() {
 		bundleStates = new HashMap<Integer,String>();
 		bundleStates.put(Bundle.ACTIVE, "ACTIVE");
 		bundleStates.put(Bundle.INSTALLED, "INSTALLED");
@@ -133,7 +133,7 @@ public class Activator implements BundleActivator {
 	/**
 	 * Initializes the bundle event states map.
 	 */
-	private static void initializeBundleEventStates() {
+	private void initializeBundleEventStates() {
 		bundleEventStates = new HashMap<Integer,String>();
 		bundleEventStates.put(BundleEvent.INSTALLED, "INSTALLED");
 		bundleEventStates.put(BundleEvent.LAZY_ACTIVATION, "LAZY_ACTIVATION");
@@ -149,7 +149,7 @@ public class Activator implements BundleActivator {
 	/**
 	 * Initializes the random classes map.
 	 */
-	private static void initializeRandomClasses() {
+	private void initializeRandomClasses() {
 		randomClasses = new HashMap<String,String>(); 
 		Properties properties = new Properties();
 		try {
@@ -173,7 +173,7 @@ public class Activator implements BundleActivator {
 	/**
 	 * Returns a string representing the state of the bundle.
 	 */
-	private static String stateAsString(Bundle bundle) {
+	private String stateAsString(Bundle bundle) {
 		return (bundle == null) ? "NULL" : 
 			(bundleStates.containsKey(bundle.getState())) ? bundleStates.get(bundle.getState()) :
 				"UNDEFINED";
@@ -182,7 +182,7 @@ public class Activator implements BundleActivator {
 	/**
 	 * Returns a string representing the state of the bundle event.
 	 */
-	private static String typeAsString(BundleEvent event) {
+	private String typeAsString(BundleEvent event) {
 		return (event == null) ? "NULL" : 
 			(bundleEventStates.containsKey(event.getType())) ? bundleEventStates.get(event.getType()) :
 				"UNDEFINED";
@@ -194,7 +194,7 @@ public class Activator implements BundleActivator {
 	 * - classpathDependenciesData: considers both bundle + dependencies
 	 *   classpath sizes.
 	 */
-	protected static void updateClasspathData(Bundle bundle) {
+	protected void updateClasspathData(Bundle bundle) {
 		String key = createBundleKey(bundle);
 		BundleWiring bw = bundle.adapt(BundleWiring.class);
 		int classpathSize = getBundleClassPathSize(bundle);
@@ -224,7 +224,7 @@ public class Activator implements BundleActivator {
 	 * Note 2: getResource() is preferred over getEntry(), since the 
 	 * first one refers to the classpath size.
 	 */
-	private static int getBundleClassPathSize(Bundle bundle) {
+	private int getBundleClassPathSize(Bundle bundle) {
 		try {
 			URL bundleURL = bundle.getResource("");
 			URL fileURL = FileLocator.toFileURL(bundleURL);
@@ -245,7 +245,7 @@ public class Activator implements BundleActivator {
 	 * Computes the classpath size of a given folder (e.g. bundle root
 	 * folder). Class files are counted.
 	 */
-	private static int getClassPathSize(File folder) {
+	private int getClassPathSize(File folder) {
 		int size = 0;
 		for(File f : folder.listFiles()) {
 			if(f.isFile()) {
@@ -261,7 +261,7 @@ public class Activator implements BundleActivator {
 	/**
 	 * Creates a CSV file with the classpath size of resolved bundles.
 	 */
-	private static void classpathToCSV() {
+	private void classpathToCSV() {
 		StringBuilder builder = new StringBuilder();
 		builder.append("Bundle,Classpath Size\n");
 
@@ -281,7 +281,7 @@ public class Activator implements BundleActivator {
 	 * Creates a CSV file with the classpath size of resolved
 	 * and non-fragment bundles. Dependencies are included.
 	 */
-	private static void classpathDependenciesToCSV() {
+	private void classpathDependenciesToCSV() {
 		StringBuilder builder = new StringBuilder();
 		builder.append("Bundle,Classpath Size\n");
 
@@ -337,7 +337,7 @@ public class Activator implements BundleActivator {
 	 * Returns the classloader of a given bundle.
 	 * TODO: Unnecessary - erase?
 	 */
-	protected static ClassLoader getBundleClassLoader(Bundle bundle) {
+	protected ClassLoader getBundleClassLoader(Bundle bundle) {
 		ClassLoader classloader = null;
 		String key = createBundleKey(bundle);
 		
@@ -367,7 +367,7 @@ public class Activator implements BundleActivator {
 	 * Writes a file given a target path and a content.
 	 * Parent folders are created.
 	 */
-	private static void writeFile(String path, String content) {
+	private void writeFile(String path, String content) {
 		try {
 			File file = new File(path);
 			file.getParentFile().mkdirs();
@@ -384,7 +384,7 @@ public class Activator implements BundleActivator {
 	/**
 	 * Creates a bundle identifier: symbolicName_version
 	 */
-	protected static String createBundleKey(Bundle bundle) {
+	protected String createBundleKey(Bundle bundle) {
 		return bundle.getSymbolicName() + "_" + bundle.getVersion();
 	}
 
@@ -393,7 +393,7 @@ public class Activator implements BundleActivator {
 	// Nested Class
 	//------------------------------------------------------------
 
-	private static final class OSGiBundleTracker extends BundleTracker {
+	private final class OSGiBundleTracker extends BundleTracker {
 
 		//------------------------------------------------------------
 		// Methods
