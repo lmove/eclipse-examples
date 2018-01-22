@@ -249,7 +249,11 @@ public class Activator implements BundleActivator {
 		int size = 0;
 		for(File f : folder.listFiles()) {
 			if(f.isFile()) {
-				size = (f.getName().endsWith(CLASS_EXTENSION)) ? size + 1 : size;
+				if (f.getName().endsWith(CLASS_EXTENSION)) {
+					size += 1;
+				} else if (f.getName().endsWith(JAR_EXTENSION)) {
+					size += + getJarClassPathSize(f);
+				}
 			}
 			else {
 				size += getClassPathSize(f);
@@ -334,33 +338,27 @@ public class Activator implements BundleActivator {
 	}
 
 	/**
-	 * Returns the classloader of a given bundle.
-	 * TODO: Unnecessary - erase?
+	 * (WARNING: non-recursive -- yet) Counts the number of classes in a given JAR
 	 */
-	protected ClassLoader getBundleClassLoader(Bundle bundle) {
-		ClassLoader classloader = null;
-		String key = createBundleKey(bundle);
-		
+	protected int getJarClassPathSize(File jar) {
+		int size = 0;
+
 		try {
-			String path = System.getProperty("user.dir") + "/plugins/" + key + JAR_EXTENSION;
-			InputStream inputStream = new FileInputStream(path);
+			InputStream inputStream = new FileInputStream(jar);
 			JarInputStream jarStream = new JarInputStream(inputStream);
 			JarEntry entry = jarStream.getNextJarEntry();
 
-			while(entry != null && classloader == null) {
-				if(!entry.isDirectory() && entry.getName().endsWith(CLASS_EXTENSION) && !entry.getName().contains("$")) {
-					String randomClass = (entry.getName().substring(0,entry.getName().lastIndexOf(CLASS_EXTENSION))).replace("/", ".");
-					classloader = bundle.loadClass(randomClass).getClassLoader();
-				}
+			while (entry != null) {
+				if (entry.getName().endsWith(CLASS_EXTENSION))
+					size += 1;
 				entry = jarStream.getNextJarEntry();
 			}
-			
-			return classloader;
 		}
 		catch(Exception e) {
-			//This is a bundle fragment. Returns null.
-			return classloader;
+			e.printStackTrace();
 		}
+
+		return size;
 	}
 
 	/**
