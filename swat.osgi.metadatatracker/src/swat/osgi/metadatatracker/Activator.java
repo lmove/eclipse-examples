@@ -19,11 +19,12 @@ import java.io.InputStream;
 import java.io.PrintWriter;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Properties;
 import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
@@ -57,6 +58,7 @@ public class Activator implements BundleActivator {
 	private static Map<String,Integer> resolvedData;
 	private static Map<String,Integer> classpathData;
 	private static Map<String,Integer> classpathDependenciesData;
+	private static List<String[]> wiringsData;
 	private static Map<Integer,String> bundleStates;
 	private static Map<Integer,String> bundleEventStates;
 	private OSGiBundleTracker bundleTracker;
@@ -93,6 +95,7 @@ public class Activator implements BundleActivator {
 			bundleStatesToCSV();
 			classpathToCSV();
 			classpathDependenciesToCSV();
+			wiringsToCSV();
 			resolvedBundlesToCSV();
 
 			System.out.println("Metadata was printed.");
@@ -112,7 +115,8 @@ public class Activator implements BundleActivator {
 	private void initializeData() {
 		classpathData = new HashMap<String,Integer>();
 		classpathDependenciesData = new HashMap<String,Integer>();
-		resolvedData = new HashMap<String, Integer>();
+		resolvedData = new HashMap<String,Integer>();
+		wiringsData = new ArrayList<String[]>();
 	}
 
 	/**
@@ -167,8 +171,10 @@ public class Activator implements BundleActivator {
 	 * - classpathData: considers only the bundle classpath size
 	 * - classpathDependenciesData: considers both bundle + dependencies
 	 *   classpath sizes.
+	 * - wiringsData: considers both import-package and require-bundle
+	 *   dependencies.
 	 */
-	protected void updateClasspathData(Bundle bundle) {
+	protected void updateClasspathWiringsData(Bundle bundle) {
 		String key = createBundleKey(bundle);
 		BundleWiring bw = bundle.adapt(BundleWiring.class);
 		int classpathSize = getBundleClassPathSize(bundle);
@@ -177,14 +183,15 @@ public class Activator implements BundleActivator {
 		classpathData.put(key, classpathSize);
 		
 		for(BundleWire wire : bw.getRequiredWires("osgi.wiring.package")) {
-			// To get the package name uncomment the following line:
-			//String pack = (String) wire.getCapability().getAttributes().get("osgi.wiring.package");
+			String pkg = (String) wire.getCapability().getAttributes().get("osgi.wiring.package");
 			Bundle b = wire.getProviderWiring().getBundle();
 			classpathSize += getBundleClassPathSize(b);
+			wiringsData.add(new String[] { key, "osgi.wiring.package", createBundleKey(b), pkg});
 		}
 		for(BundleWire wire : bw.getRequiredWires("osgi.wiring.bundle")) {
 			Bundle b = wire.getProviderWiring().getBundle();
 			classpathSize += getBundleClassPathSize(b);
+			wiringsData.add(new String[] { key, "osgi.wiring.bundle", createBundleKey(b), ""});
 		}
 		
 		// Insert once all dependencies have been evaluated.
@@ -275,6 +282,23 @@ public class Activator implements BundleActivator {
 		writeFile(DATA_FOLDER + "/classpath-dependencies-info.csv", builder.toString());
 	}
 
+	/**
+	 * Creates a CSV file with the wirings of resolved bundles.
+	 */
+	private void wiringsToCSV() {
+		StringBuilder builder = new StringBuilder();
+		builder.append("Bundle,Dependency Type,Wired Bundle,Package\n");
+
+		for(String[] values : wiringsData) {
+			String line = "";
+			for(int i = 0; i < values.length; i++) {
+				line += (i == values.length - 1) ? values[i] : values[i] + CSV_SEPARATOR;
+			}
+			builder.append(line + '\n');
+		}
+
+		writeFile(DATA_FOLDER + "/wirings-info.csv", builder.toString());
+	}
 
 	/**
 	 * Creates a CSV file with the ordering in which bundles
@@ -395,7 +419,7 @@ public class Activator implements BundleActivator {
 			if(event.getType() == BundleEvent.RESOLVED) {
 				//Update number of resolved bundles in data structure.
 				resolvedData.put(key, resolvedData.size());
-				updateClasspathData(bundle);
+				updateClasspathWiringsData(bundle);
 			}	
 			System.out.println("[MODIFIED] " + key + " - STATE: " + stateAsString(bundle));
 		}
