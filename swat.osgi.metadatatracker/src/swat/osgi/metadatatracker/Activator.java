@@ -20,6 +20,7 @@ import java.io.PrintWriter;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -175,27 +176,36 @@ public class Activator implements BundleActivator {
 	 *   dependencies.
 	 */
 	protected void updateClasspathWiringsData(Bundle bundle) {
-		String key = createBundleKey(bundle);
-		BundleWiring bw = bundle.adapt(BundleWiring.class);
-		int classpathSize = getBundleClassPathSize(bundle);
-		
-		// Insert the classpath size of the studied bundle (without dependencies).
-		classpathData.put(key, classpathSize);
-		
-		for(BundleWire wire : bw.getRequiredWires("osgi.wiring.package")) {
-			String pkg = (String) wire.getCapability().getAttributes().get("osgi.wiring.package");
-			Bundle b = wire.getProviderWiring().getBundle();
-			classpathSize += getBundleClassPathSize(b);
-			wiringsData.add(new String[] { key, "osgi.wiring.package", createBundleKey(b), pkg});
+		try {
+			String key = createBundleKey(bundle);
+			BundleWiring wiring = bundle.adapt(BundleWiring.class);
+
+			// Logging required packages
+			for (BundleWire wire : wiring.getRequiredWires("osgi.wiring.package")) {
+				String pkg = (String) wire.getCapability().getAttributes().get("osgi.wiring.package");
+				Bundle b = wire.getProviderWiring().getBundle();
+				wiringsData.add(new String[] { key, "osgi.wiring.package", createBundleKey(b), pkg});
+			}
+
+			// Logging required bundles
+			for (BundleWire wire : wiring.getRequiredWires("osgi.wiring.bundle")) {
+				Bundle b = wire.getProviderWiring().getBundle();
+				wiringsData.add(new String[] { key, "osgi.wiring.bundle", createBundleKey(b), ""});
+			}
+
+			// (incudes local classpath + JARs + fragments + dependencies)
+			Collection<String> recursiveRes = wiring.listResources("/", "*.class",
+					BundleWiring.LISTRESOURCES_RECURSE);
+
+			// (incudes local classpath + JARs + fragments)
+			Collection<String> localRes = wiring.listResources("/", "*.class",
+					BundleWiring.LISTRESOURCES_LOCAL | BundleWiring.LISTRESOURCES_RECURSE);
+
+			classpathData.put(key, localRes.size());
+			classpathDependenciesData.put(key, recursiveRes.size());
+		} catch (Exception e) {
+			System.out.println(e.getMessage());
 		}
-		for(BundleWire wire : bw.getRequiredWires("osgi.wiring.bundle")) {
-			Bundle b = wire.getProviderWiring().getBundle();
-			classpathSize += getBundleClassPathSize(b);
-			wiringsData.add(new String[] { key, "osgi.wiring.bundle", createBundleKey(b), ""});
-		}
-		
-		// Insert once all dependencies have been evaluated.
-		classpathDependenciesData.put(key, classpathSize);
 	}
 	
 	/**
@@ -404,7 +414,7 @@ public class Activator implements BundleActivator {
 		 */
 		public Object addingBundle(Bundle bundle, BundleEvent event) {
 			String key = createBundleKey(bundle);
-			System.out.println("[ADD] " + key + " - STATE: " + stateAsString(bundle));
+//			System.out.println("[ADD] " + key + " - STATE: " + stateAsString(bundle));
 			return bundle;
 		}
 
@@ -421,7 +431,7 @@ public class Activator implements BundleActivator {
 				resolvedData.put(key, resolvedData.size());
 				updateClasspathWiringsData(bundle);
 			}	
-			System.out.println("[MODIFIED] " + key + " - STATE: " + stateAsString(bundle));
+//			System.out.println("[MODIFIED] " + key + " - STATE: " + stateAsString(bundle));
 		}
 	}
 
