@@ -414,7 +414,7 @@ public class Activator implements BundleActivator {
 		 */
 		public Object addingBundle(Bundle bundle, BundleEvent event) {
 			String key = createBundleKey(bundle);
-//			System.out.println("[ADD] " + key + " - STATE: " + stateAsString(bundle));
+			System.out.println("[ADD] " + key + " - STATE: " + stateAsString(bundle));
 			return bundle;
 		}
 
@@ -431,7 +431,7 @@ public class Activator implements BundleActivator {
 				resolvedData.put(key, resolvedData.size());
 				updateClasspathWiringsData(bundle);
 			}	
-//			System.out.println("[MODIFIED] " + key + " - STATE: " + stateAsString(bundle));
+			System.out.println("[MODIFIED] " + key + " - STATE: " + stateAsString(bundle));
 		}
 	}
 
