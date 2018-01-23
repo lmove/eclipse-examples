@@ -3,3 +3,6 @@
 # Package Files #
 *.war
 *.ear
+osgi.standalone.configuration/plugins/*
+osgi.standalone.configuration/configuration/*.log
+
