@@ -57,7 +57,6 @@ public class Activator implements BundleActivator {
 	private static Map<String,Integer> resolvedData;
 	private static Map<String,Integer> classpathData;
 	private static Map<String,Integer> classpathDependenciesData;
-	private static Map<String, String> randomClasses;
 	private static Map<Integer,String> bundleStates;
 	private static Map<Integer,String> bundleEventStates;
 	private OSGiBundleTracker bundleTracker;
@@ -79,7 +78,6 @@ public class Activator implements BundleActivator {
 		initializeData();
 		initializeBundleStates();
 		initializeBundleEventStates();
-		initializeRandomClasses();
 
 		bundleTracker = new OSGiBundleTracker(context, trackStates, null);
 		bundleTracker.open();
@@ -144,30 +142,6 @@ public class Activator implements BundleActivator {
 		bundleEventStates.put(BundleEvent.UNINSTALLED, "UNINSTALLED");
 		bundleEventStates.put(BundleEvent.UNRESOLVED, "UNRESOLVED");
 		bundleEventStates.put(BundleEvent.UPDATED, "UPDATED");
-	}
-
-	/**
-	 * Initializes the random classes map.
-	 */
-	private static void initializeRandomClasses() {
-		randomClasses = new HashMap<String,String>(); 
-		Properties properties = new Properties();
-		try {
-			InputStream is = new FileInputStream(DATA_FOLDER + "/random-classes-classloaders.properties");
-			properties.load(is);
-			Iterator<Entry<Object, Object>> it = properties.entrySet().iterator();
-			Entry<Object,Object> entry = null;
-
-			while(it.hasNext()) {
-				entry = it.next();
-				String bundle = (String) entry.getKey();
-				String classes = (String) entry.getValue();
-				randomClasses.put(bundle, classes);
-			}
-		}
-		catch(IOException e) {
-			e.printStackTrace();
-		}
 	}
 
 	/**
